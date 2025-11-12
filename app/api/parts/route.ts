@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
+import { Part } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Calculate stock status for each part
-    const partsWithStatus = parts.map(part => {
+    const partsWithStatus = parts.map((part: Part) => {
       const totalBoxes = part.currentPallets * part.boxesPerPallet + part.currentBoxes
       const totalUnits = totalBoxes * part.unitsPerBox
       const percentOfAnnual = (totalUnits / part.annualOrder) * 100
