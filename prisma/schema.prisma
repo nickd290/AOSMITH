@@ -1,0 +1,131 @@
+// Inventory Release Management System Schema
+// JD Graphic <-> ePrint Group <-> AO Smith
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User authentication model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  releases     Release[]
+  productions  Production[]
+
+  @@index([email])
+}
+
+enum Role {
+  CUSTOMER  // ePrint Group
+  ADMIN     // JD Graphic
+}
+
+// Part number definitions
+model Part {
+  id            String   @id @default(cuid())
+  partNumber    String   @unique
+  description   String
+  unitsPerBox   Int
+  boxesPerPallet Int     @default(68)
+  pricePerUnit  Float
+  annualOrder   Int
+  currentPallets Int     @default(0)
+  currentBoxes   Int     @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  releases      Release[]
+  productions   Production[]
+
+  @@index([partNumber])
+}
+
+// Shipping locations (AO Smith facilities)
+model ShippingLocation {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  address   String
+  city      String
+  state     String
+  zip       String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  releases  Release[]
+}
+
+// Inventory releases (customer orders)
+model Release {
+  id                  String           @id @default(cuid())
+  releaseNumber       String           @unique
+  partId              String
+  part                Part             @relation(fields: [partId], references: [id])
+  shippingLocationId  String
+  shippingLocation    ShippingLocation @relation(fields: [shippingLocationId], references: [id])
+  pallets             Int              @default(5)
+  boxes               Int              @default(0)
+  totalUnits          Int              // Calculated: (pallets * 68 + boxes) * unitsPerBox
+  userId              String
+  user                User             @relation(fields: [userId], references: [id])
+
+  // Document generation fields
+  customerPONumber    String           // Customer's PO# (e.g., "4502654775")
+  ticketNumber        String?          // Internal ticket # (e.g., "11507")
+  batchNumber         String?          // Production batch # (e.g., "3415")
+  shipVia             String?          // Carrier (e.g., "Averitt Collect")
+  freightTerms        String?          // "Prepaid" or "Collect"
+  paymentTerms        String?          // e.g., "2% 30, Net 60"
+  cartons             Int?             // Number of cartons
+  weight              Float?           // Shipping weight in lbs
+  shippingClass       String?          // Freight class (e.g., "55")
+  manufactureDate     DateTime?        // Date of manufacture for labels
+
+  // Document storage
+  packingSlipUrl      String?          // PDF storage path
+  boxLabelsUrl        String?          // Box labels PDF path
+  documentsGenerated  String?          // JSON: {"packingSlip": true, "boxLabels": true}
+
+  notes               String?
+  status              ReleaseStatus    @default(COMPLETED)
+  createdAt           DateTime         @default(now())
+
+  @@index([partId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([releaseNumber])
+  @@index([customerPONumber])
+}
+
+enum ReleaseStatus {
+  COMPLETED
+  SHIPPED
+}
+
+// Production runs (admin adds inventory)
+model Production {
+  id          String   @id @default(cuid())
+  partId      String
+  part        Part     @relation(fields: [partId], references: [id])
+  pallets     Int
+  boxes       Int      @default(0)
+  totalUnits  Int      // Calculated: (pallets * 68 + boxes) * unitsPerBox
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([partId])
+  @@index([createdAt])
+}

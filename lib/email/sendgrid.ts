@@ -1,0 +1,268 @@
+import sgMail from '@sendgrid/mail'
+import * as fs from 'fs'
+
+// Initialize SendGrid
+const apiKey = process.env.SENDGRID_API_KEY || ''
+if (apiKey) {
+  sgMail.setApiKey(apiKey)
+}
+
+export interface EmailAttachment {
+  filename: string
+  filePath: string
+  type?: string
+}
+
+export interface ReleaseEmailData {
+  releaseNumber: string
+  partNumber: string
+  partDescription: string
+  pallets: number
+  boxes: number
+  totalUnits: number
+  customerPONumber: string
+  shippingLocation: string
+  invoiceTotal: string
+}
+
+/**
+ * Send release notification email with PDF attachments
+ */
+export async function sendReleaseNotification(
+  emailData: ReleaseEmailData,
+  attachments: EmailAttachment[]
+): Promise<void> {
+  const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailTo = process.env.EMAIL_TO || 'nick@jdgraphic.com'
+  const emailCc = process.env.EMAIL_CC || ''
+
+  // Prepare attachments for SendGrid
+  const sgAttachments = attachments.map((att) => {
+    const content = fs.readFileSync(att.filePath).toString('base64')
+    return {
+      content,
+      filename: att.filename,
+      type: att.type || 'application/pdf',
+      disposition: 'attachment',
+    }
+  })
+
+  // Create HTML email body
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+          <td align="center" style="padding: 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #1a4d6b 0%, #0d3147 100%); padding: 20px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">
+                          📦 Release Notification
+                        </div>
+                      </td>
+                      <td align="right" style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 16px; font-weight: 700;">
+                          ${emailData.releaseNumber}
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Main Content Card -->
+              <tr>
+                <td style="padding: 24px; background-color: #ffffff;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #1a4d6b; border-radius: 4px;">
+                    <tr>
+                      <td style="padding: 16px 20px;">
+
+                        <!-- Two Column Grid -->
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <!-- Row 1 -->
+                          <tr>
+                            <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Release Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.releaseNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Customer PO #</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.customerPONumber}</div>
+                            </td>
+                          </tr>
+
+                          <!-- Separator -->
+                          <tr>
+                            <td colspan="2" style="padding: 8px 0;">
+                              <div style="height: 1px; background-color: #e5e7eb;"></div>
+                            </td>
+                          </tr>
+
+                          <!-- Row 2 -->
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Part Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.partNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Pallets</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.pallets}</div>
+                            </td>
+                          </tr>
+
+                          <!-- Row 3 -->
+                          <tr>
+                            <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Description</div>
+                              <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.partDescription}</div>
+                            </td>
+                            <td width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Boxes</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.boxes}</div>
+                            </td>
+                          </tr>
+
+                          <!-- Separator -->
+                          <tr>
+                            <td colspan="2" style="padding: 8px 0;">
+                              <div style="height: 1px; background-color: #e5e7eb;"></div>
+                            </td>
+                          </tr>
+
+                          <!-- Row 4 -->
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 0 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship To</div>
+                              <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.shippingLocation}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 0 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Units</div>
+                              <div style="font-size: 16px; color: #111827; font-weight: 700;">${emailData.totalUnits.toLocaleString()}</div>
+                            </td>
+                          </tr>
+                        </table>
+
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Invoice Total Highlight -->
+              <tr>
+                <td style="padding: 0 24px 24px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #1a4d6b 0%, #0d3147 100%); border-radius: 6px;">
+                    <tr>
+                      <td style="padding: 18px 24px; text-align: center;">
+                        <div style="color: #93c5fd; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Invoice Total</div>
+                        <div style="color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">${emailData.invoiceTotal}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Attachments -->
+              <tr>
+                <td style="padding: 0 24px 24px 24px;">
+                  <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Attached Documents</div>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    ${attachments.map(att => `
+                      <tr>
+                        <td style="padding: 4px 0;">
+                          <span style="display: inline-block; background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500;">
+                            📄 ${att.filename}
+                          </span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
+                  <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
+                    Enterprise Print Group – Automated Release Notification
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  // Plain text version for email clients that don't support HTML
+  const textBody = `
+New Release Created - ${emailData.releaseNumber}
+
+RELEASE DETAILS
+Release Number: ${emailData.releaseNumber}
+Customer PO #: ${emailData.customerPONumber}
+
+PRODUCT INFORMATION
+Part Number: ${emailData.partNumber}
+Description: ${emailData.partDescription}
+
+QUANTITY
+Pallets: ${emailData.pallets}
+Boxes: ${emailData.boxes}
+Total Units: ${emailData.totalUnits.toLocaleString()}
+
+SHIPPING INFORMATION
+Ship To: ${emailData.shippingLocation}
+
+Invoice Total: ${emailData.invoiceTotal}
+
+Attached Documents: ${attachments.map(att => att.filename).join(', ')}
+
+---
+Enterprise Print Group - Automated Release Notification
+  `
+
+  const msg = {
+    to: emailTo,
+    cc: emailCc.split(',').map(email => email.trim()).filter(email => email),
+    from: {
+      email: emailFrom,
+      name: emailFromName,
+    },
+    subject: `New Release Created - ${emailData.releaseNumber}`,
+    text: textBody,
+    html: htmlBody,
+    attachments: sgAttachments,
+  }
+
+  try {
+    if (!apiKey) {
+      console.log('⚠️ SendGrid API key not configured. Email would have been sent to:', emailTo)
+      console.log('📧 Subject:', msg.subject)
+      console.log('📎 Attachments:', attachments.map(a => a.filename).join(', '))
+      return
+    }
+
+    await sgMail.send(msg)
+    const ccList = emailCc ? `, CC: ${emailCc}` : ''
+    console.log(`✅ Email sent successfully to: ${emailTo}${ccList}`)
+  } catch (error) {
+    console.error('❌ Error sending email:', error)
+    throw error
+  }
+}
