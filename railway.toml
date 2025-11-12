@@ -11,4 +11,4 @@ cmds = ["npm ci"]
 cmds = ["DATABASE_URL=postgresql://user:pass@localhost:5432/db npx prisma generate", "npm run build"]
 
 [deploy]
-startCommand = "npm run start"
+startCommand = "npm run start -- -H 0.0.0.0"
