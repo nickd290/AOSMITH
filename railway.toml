@@ -1,17 +1,5 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
 startCommand = "npm run start"
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 3
-healthcheckPath = "/"
-healthcheckTimeout = 100
-
-[[deploy.healthcheck]]
-httpPath = "/"
-initialDelaySeconds = 30
-periodSeconds = 10
-timeoutSeconds = 10
-failureThreshold = 3
