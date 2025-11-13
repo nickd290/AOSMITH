@@ -1,5 +1,6 @@
-const { defineConfig, env } = require('prisma/config')
 require('dotenv').config({ override: true })
+
+const { defineConfig } = require('prisma/config')
 
 module.exports = defineConfig(
   {
@@ -9,7 +10,7 @@ module.exports = defineConfig(
   {
     class: {
       datasource: {
-        url: env('DATABASE_URL'),
+        url: process.env.DATABASE_URL,  // Now uses loaded env
       },
     },
   }

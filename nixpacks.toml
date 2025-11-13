@@ -1,0 +1,7 @@
+[phases.build]
+cmds = [
+  'export DATABASE_URL=$DATABASE_PUBLIC_URL',
+  'npx prisma generate',
+  'unset DATABASE_URL',
+  'npm run build'
+]

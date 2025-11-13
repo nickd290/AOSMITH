@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx prisma migrate deploy && next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -19,6 +19,7 @@
     "@sendgrid/mail": "^8.1.6",
     "bcryptjs": "^3.0.3",
     "canvas": "^3.2.0",
+    "dotenv": "^17.2.3",
     "jsbarcode": "^3.12.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
