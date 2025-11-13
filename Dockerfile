@@ -42,13 +42,12 @@ COPY --from=builder /app/.next/static ./.next/static
 
 USER nextjs
 
-# Railway uses PORT environment variable - default to 3000 if not set
-ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-EXPOSE 3000
+EXPOSE 8080
 
 # Health check to verify app is responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:8080/api/health || exit 1
 
-CMD ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=3000 node server.js"]
+CMD ["node", "server.js"]
