@@ -26,16 +26,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Wait for client-side mount before accessing localStorage (SSR safety)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Load token from localStorage on mount
   useEffect(() => {
+    if (!isMounted) return // Skip during SSR
+
     const storedToken = localStorage.getItem('token')
     if (storedToken) {
       verifyToken(storedToken)
     } else {
       setIsLoading(false)
     }
-  }, [])
+  }, [isMounted])
 
   const verifyToken = async (tokenToVerify: string) => {
     try {

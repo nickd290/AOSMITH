@@ -26,8 +26,8 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-# Install runtime dependencies for canvas
-RUN apk add --no-cache cairo jpeg pango giflib pixman
+# Install runtime dependencies for canvas and curl for health checks
+RUN apk add --no-cache cairo jpeg pango giflib pixman curl
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -43,5 +43,9 @@ COPY --from=builder /app/.next/static ./.next/static
 USER nextjs
 
 EXPOSE 3000
+
+# Health check to verify app is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node server.js"]
