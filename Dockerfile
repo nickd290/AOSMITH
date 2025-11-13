@@ -37,8 +37,9 @@ RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
 USER nextjs
 
@@ -50,4 +51,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8080/api/health || exit 1
 
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
