@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "npx prisma migrate deploy && next start",
+    "start": "next start -p 8080",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
