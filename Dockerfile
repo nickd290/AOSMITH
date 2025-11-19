@@ -11,6 +11,8 @@ RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
+# Install runtime dependencies needed for canvas during build
+RUN apk add --no-cache cairo jpeg pango giflib pixman
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
