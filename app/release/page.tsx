@@ -55,7 +55,23 @@ export default function ReleasePage() {
   const [batchNumber, setBatchNumber] = useState('')
   const [shipVia, setShipVia] = useState('Averitt Collect')
   const [freightTerms, setFreightTerms] = useState('Prepaid')
-  const [manufactureDate, setManufactureDate] = useState(new Date().toISOString().split('T')[0])
+  const [shipDate, setShipDate] = useState(new Date().toISOString().split('T')[0])
+
+  // Calculate ETA delivery date (5 business days from ship date)
+  const calculateETA = (shipDateStr: string): string => {
+    const date = new Date(shipDateStr)
+    let daysToAdd = 5
+    while (daysToAdd > 0) {
+      date.setDate(date.getDate() + 1)
+      // Skip weekends
+      if (date.getDay() !== 0 && date.getDay() !== 6) {
+        daysToAdd--
+      }
+    }
+    return date.toISOString().split('T')[0]
+  }
+
+  const etaDeliveryDate = calculateETA(shipDate)
 
   // Release result
   const [release, setRelease] = useState<Release | null>(null)
@@ -122,7 +138,8 @@ export default function ReleasePage() {
           batchNumber,
           shipVia,
           freightTerms,
-          manufactureDate,
+          shipDate,
+          etaDeliveryDate,
         }),
       })
 
@@ -382,14 +399,34 @@ export default function ReleasePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Manufacture Date
+                    Ship Date
                   </label>
                   <input
                     type="date"
-                    value={manufactureDate}
-                    onChange={(e) => setManufactureDate(e.target.value)}
+                    value={shipDate}
+                    onChange={(e) => setShipDate(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   />
+                </div>
+              </div>
+
+              {/* ETA Delivery Date - Always shown based on Ship Date */}
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">ETA Delivery Date:</span>
+                    <p className="text-lg font-semibold text-blue-700">
+                      {new Date(etaDeliveryDate + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>5 business days from pickup</p>
+                  </div>
                 </div>
               </div>
 

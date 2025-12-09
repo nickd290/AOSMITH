@@ -101,7 +101,8 @@ model Release {
 
   // Shipping tracking
   trackingNumber      String?          // FedEx/carrier tracking number
-  shipDate            DateTime?        // Actual ship date
+  shipDate            DateTime?        // Scheduled ship date (pickup date)
+  etaDeliveryDate     DateTime?        // Estimated delivery date (5 business days from ship date)
 
   // impactd122 integration
   impactJobId         String?          // ID of job created in impactd122

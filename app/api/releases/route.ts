@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
       shipVia,
       freightTerms,
       paymentTerms,
-      manufactureDate,
+      shipDate,
+      etaDeliveryDate,
       cartons,
       weight,
       shippingClass
@@ -109,7 +110,8 @@ export async function POST(request: NextRequest) {
         shipVia: shipVia || 'Averitt Collect',
         freightTerms: freightTerms || 'Prepaid',
         paymentTerms: paymentTerms || '2% 30, Net 60',
-        manufactureDate: manufactureDate ? new Date(manufactureDate) : new Date(),
+        shipDate: shipDate ? new Date(shipDate) : new Date(),
+        etaDeliveryDate: etaDeliveryDate ? new Date(etaDeliveryDate) : null,
         cartons: cartons || totalBoxesReleased,
         weight: weight || 0,
         shippingClass: shippingClass || '55',
@@ -187,7 +189,8 @@ export async function POST(request: NextRequest) {
       description: release.part.description,
       unitsPerBox: release.part.unitsPerBox,
       batchNumber: release.batchNumber || 'N/A',
-      manufactureDate: release.manufactureDate || release.createdAt,
+      shipDate: release.shipDate || release.createdAt,
+      etaDeliveryDate: release.etaDeliveryDate,
       totalBoxes,
     }
 
