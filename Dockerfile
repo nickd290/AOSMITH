@@ -1,4 +1,5 @@
 # Use Debian-based image instead of Alpine for better native module support
+# Cache bust v2 - Force rebuild to regenerate Prisma client with debian-openssl-3.0.x
 FROM node:20-slim AS base
 
 # Install dependencies only when needed
