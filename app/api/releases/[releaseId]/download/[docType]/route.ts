@@ -174,8 +174,8 @@ export async function GET(
       )
     }
 
-    // Return PDF as binary response
-    return new NextResponse(pdfBuffer, {
+    // Return PDF as binary response (convert Buffer to Uint8Array for TypeScript compatibility)
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
