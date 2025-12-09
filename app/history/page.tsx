@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2 } from 'lucide-react'
 
 interface Release {
   id: string
@@ -64,6 +64,9 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPart, setSelectedPart] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
+
+  // Download state
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -188,6 +191,42 @@ export default function HistoryPage() {
       alert('Failed to update release. Please try again.')
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  const downloadDocument = async (releaseId: string, docType: 'packing-slip' | 'box-labels' | 'invoice') => {
+    setDownloadingDoc(`${releaseId}-${docType}`)
+    try {
+      const response = await fetch(`/api/releases/${releaseId}/download/${docType}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to download document')
+      }
+
+      // Get the blob and create a download link
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      a.download = filenameMatch ? filenameMatch[1] : `${docType}-${releaseId}.pdf`
+
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error downloading document:', err)
+      alert('Failed to download document. Please try again.')
+    } finally {
+      setDownloadingDoc(null)
     }
   }
 
@@ -569,53 +608,47 @@ export default function HistoryPage() {
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Documents</h3>
                 <div className="space-y-2">
-                  {selectedRelease.packingSlipUrl ? (
-                    <a
-                      href={selectedRelease.packingSlipUrl}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
+                  <button
+                    onClick={() => downloadDocument(selectedRelease.id, 'packing-slip')}
+                    disabled={downloadingDoc === `${selectedRelease.id}-packing-slip`}
+                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                  >
+                    {downloadingDoc === `${selectedRelease.id}-packing-slip` ? (
+                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                    ) : (
                       <FileText className="w-5 h-5 text-blue-600" />
-                      <span className="font-medium">Packing Slip</span>
-                    </a>
-                  ) : null}
-                  {selectedRelease.boxLabelsUrl ? (
-                    <a
-                      href={selectedRelease.boxLabelsUrl}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
+                    )}
+                    <span className="font-medium">Packing Slip</span>
+                    <Download className="w-4 h-4 ml-auto text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => downloadDocument(selectedRelease.id, 'box-labels')}
+                    disabled={downloadingDoc === `${selectedRelease.id}-box-labels`}
+                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                  >
+                    {downloadingDoc === `${selectedRelease.id}-box-labels` ? (
+                      <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
+                    ) : (
                       <Tag className="w-5 h-5 text-green-600" />
-                      <span className="font-medium">
-                        Box Labels ({selectedRelease.pallets * BOXES_PER_SKID + selectedRelease.boxes} labels)
-                      </span>
-                    </a>
-                  ) : null}
-                  {selectedRelease.invoiceUrl ? (
-                    <a
-                      href={selectedRelease.invoiceUrl}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
+                    )}
+                    <span className="font-medium">
+                      Box Labels ({selectedRelease.pallets * BOXES_PER_SKID + selectedRelease.boxes} labels)
+                    </span>
+                    <Download className="w-4 h-4 ml-auto text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => downloadDocument(selectedRelease.id, 'invoice')}
+                    disabled={downloadingDoc === `${selectedRelease.id}-invoice`}
+                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                  >
+                    {downloadingDoc === `${selectedRelease.id}-invoice` ? (
+                      <Loader2 className="w-5 h-5 text-purple-600 animate-spin" />
+                    ) : (
                       <Receipt className="w-5 h-5 text-purple-600" />
-                      <span className="font-medium">Invoice to EPrint Group</span>
-                    </a>
-                  ) : null}
-                  {!selectedRelease.packingSlipUrl && !selectedRelease.boxLabelsUrl && (
-                    <button
-                      onClick={() => generateDocuments(selectedRelease.id)}
-                      className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 w-full"
-                    >
-                      <Package className="w-5 h-5 text-blue-600" />
-                      <span className="font-medium text-blue-700">Generate Documents</span>
-                    </button>
-                  )}
+                    )}
+                    <span className="font-medium">Invoice to EPrint Group</span>
+                    <Download className="w-4 h-4 ml-auto text-gray-400" />
+                  </button>
                 </div>
               </div>
 
