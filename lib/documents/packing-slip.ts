@@ -58,29 +58,32 @@ export function generatePackingSlip(data: PackingSlipData): jsPDF {
   // === HEADER SECTION ===
   let currentY = margin
 
-  // Logo placeholder (left side)
-  // TODO: Add EPG logo when available at /public/images/epg-logo.png
-  const logoPath = path.join(process.cwd(), 'public', 'images', 'epg-logo.png')
+  // EPG Logo (left side)
+  const logoPath = path.join(process.cwd(), 'public', 'images', 'epg-logo.jpg')
+  let logoWidth = 0
   if (fs.existsSync(logoPath)) {
     try {
-      doc.addImage(logoPath, 'PNG', margin, currentY, 60, 60)
+      const logoData = fs.readFileSync(logoPath)
+      const logoBase64 = logoData.toString('base64')
+      const logoDataUrl = `data:image/jpeg;base64,${logoBase64}`
+      // Logo dimensions - wider format to match EPG branding
+      logoWidth = 150
+      const logoHeight = 45
+      doc.addImage(logoDataUrl, 'JPEG', margin, currentY, logoWidth, logoHeight)
     } catch (e) {
-      // Logo not available, skip
+      console.error('Failed to load logo:', e)
+      logoWidth = 0
     }
   }
 
-  // Company name and contact info (left side)
-  doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(41, 128, 185) // Blue color
-  doc.text('enterprise print group', margin + 70, currentY + 15)
-
+  // Company contact info (below logo or at top if no logo)
+  const contactY = logoWidth > 0 ? currentY + 50 : currentY + 15
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 100, 100)
+  const contactInfo = 'P.O. Box 52870 | Knoxville, TN 37950 | 865-219-5587 | www.eprintgroup.com'
+  doc.text(contactInfo, margin, contactY)
   doc.setTextColor(0, 0, 0)
-  const contactInfo =
-    'P.O. Box 52870 | Knoxville, TN 37950 | 865-219-5587 | www.eprintgroup.com'
-  doc.text(contactInfo, margin + 70, currentY + 30)
 
   // Document title (right side)
   doc.setFontSize(22)
