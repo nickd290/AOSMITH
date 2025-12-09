@@ -1,8 +1,20 @@
-FROM node:20-alpine AS base
+# Use Debian-based image instead of Alpine for better native module support
+FROM node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat cairo-dev jpeg-dev pango-dev giflib-dev build-base g++ pixman-dev
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libpixman-1-dev \
+    pkg-config \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy package files
@@ -12,7 +24,16 @@ RUN npm ci
 # Rebuild the source code only when needed
 FROM base AS builder
 # Install runtime dependencies needed for canvas during build
-RUN apk add --no-cache cairo jpeg pango giflib pixman
+RUN apt-get update && apt-get install -y \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libpixman-1-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -32,13 +53,22 @@ FROM base AS runner
 WORKDIR /app
 
 # Install runtime dependencies for canvas and curl for health checks
-RUN apk add --no-cache cairo jpeg pango giflib pixman curl
+RUN apt-get update && apt-get install -y \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libpixman-1-0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
@@ -47,8 +77,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 
-# Try running as root to diagnose permission issues
-# USER nextjs
+USER nextjs
 
 ENV HOSTNAME=0.0.0.0
 
