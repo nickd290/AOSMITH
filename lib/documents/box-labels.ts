@@ -12,20 +12,21 @@ interface BoxLabelData {
 }
 
 /**
- * Generate 4x6 inch box labels with 2x3 grid layout
- * Matches the format from 100307705.pdf and 100309797.pdf samples
+ * Generate 4x6 inch box labels in LANDSCAPE orientation (6" wide x 4" tall)
+ * Standard thermal label format for shipping labels
  */
 export function generateBoxLabels(data: BoxLabelData): jsPDF {
+  // Create 4x6 label in landscape orientation (6" wide x 4" tall)
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'in',
-    format: [4, 6], // 4x6 inch labels
+    format: [4, 6], // 4x6 label stock, landscape makes it 6" wide x 4" tall
   })
 
   // Generate one label per box
   for (let boxNum = 1; boxNum <= data.totalBoxes; boxNum++) {
     if (boxNum > 1) {
-      doc.addPage([4, 6])
+      doc.addPage([4, 6], 'landscape')
     }
 
     generateSingleBoxLabel(doc, data, boxNum)
@@ -39,38 +40,37 @@ function generateSingleBoxLabel(
   data: BoxLabelData,
   boxNumber: number
 ): void {
-  const pageWidth = 4
-  const pageHeight = 6
-  const margin = 0.1
+  // 6" wide x 4" tall
+  const pageWidth = 6
+  const pageHeight = 4
+  const margin = 0.2
   const cellWidth = (pageWidth - 2 * margin) / 2
   const cellHeight = (pageHeight - 2 * margin) / 3
 
-  // Draw grid lines (bolder to match sample)
-  doc.setLineWidth(0.025)
+  // Draw grid lines
+  doc.setLineWidth(0.015)
   doc.setDrawColor(0, 0, 0)
 
-  // Vertical line
+  // Outer border
+  doc.rect(margin, margin, pageWidth - 2 * margin, pageHeight - 2 * margin)
+
+  // Vertical line (center)
   doc.line(pageWidth / 2, margin, pageWidth / 2, pageHeight - margin)
 
   // Horizontal lines
   doc.line(margin, margin + cellHeight, pageWidth - margin, margin + cellHeight)
-  doc.line(
-    margin,
-    margin + 2 * cellHeight,
-    pageWidth - margin,
-    margin + 2 * cellHeight
-  )
+  doc.line(margin, margin + 2 * cellHeight, pageWidth - margin, margin + 2 * cellHeight)
 
   // === TOP LEFT: Company Address ===
-  doc.setFontSize(9)
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   const addressX = margin + 0.1
-  let addressY = margin + 0.2
+  let addressY = margin + 0.25
 
   doc.text('Enterprise Print Group', addressX, addressY)
-  addressY += 0.15
+  addressY += 0.16
   doc.text('6234 Enterprise Drive', addressX, addressY)
-  addressY += 0.15
+  addressY += 0.16
   doc.text('Knoxville, TN 37909', addressX, addressY)
 
   // === TOP RIGHT: Box Quantity ===
@@ -85,11 +85,10 @@ function generateSingleBoxLabel(
   const quantityBarcode = generateBarcodeWithValue(data.unitsPerBox.toString(), {
     width: 1.5,
     height: 40,
-    fontSize: 11,
+    fontSize: 12,
   })
 
-  // Add barcode image
-  doc.addImage(quantityBarcode, 'PNG', topRightX, topRightY + 0.1, 1.6, 0.6)
+  doc.addImage(quantityBarcode, 'PNG', topRightX, topRightY + 0.05, 2.0, 0.55)
 
   // === MIDDLE LEFT: Part Number ===
   const midLeftX = margin + 0.1
@@ -103,10 +102,10 @@ function generateSingleBoxLabel(
   const partBarcode = generateBarcodeWithValue(data.partNumber, {
     width: 1.5,
     height: 40,
-    fontSize: 11,
+    fontSize: 12,
   })
 
-  doc.addImage(partBarcode, 'PNG', midLeftX, midLeftY + 0.1, 1.6, 0.6)
+  doc.addImage(partBarcode, 'PNG', midLeftX, midLeftY + 0.05, 2.0, 0.55)
 
   // === MIDDLE RIGHT: Batch Number ===
   const midRightX = pageWidth / 2 + 0.1
@@ -120,10 +119,10 @@ function generateSingleBoxLabel(
   const batchBarcode = generateBarcodeWithValue(data.batchNumber, {
     width: 1.5,
     height: 40,
-    fontSize: 11,
+    fontSize: 12,
   })
 
-  doc.addImage(batchBarcode, 'PNG', midRightX, midRightY + 0.1, 1.6, 0.6)
+  doc.addImage(batchBarcode, 'PNG', midRightX, midRightY + 0.05, 2.0, 0.55)
 
   // === BOTTOM LEFT: Description ===
   const bottomLeftX = margin + 0.1
@@ -133,24 +132,26 @@ function generateSingleBoxLabel(
   doc.setFont('helvetica', 'bold')
   doc.text('Description', bottomLeftX, bottomLeftY)
 
-  bottomLeftY += 0.15
-  doc.setFontSize(9)
+  bottomLeftY += 0.18
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
 
   // Split description if too long (convert to uppercase to match sample)
-  const descLines = doc.splitTextToSize(data.description.toUpperCase(), cellWidth * 2 - 0.2)
+  const descLines = doc.splitTextToSize(data.description.toUpperCase(), cellWidth - 0.3)
   doc.text(descLines, bottomLeftX, bottomLeftY)
 
-  // === BOTTOM RIGHT: Manufacture Date ===
+  // === BOTTOM RIGHT: Date of Manufacture ===
   const bottomRightX = pageWidth / 2 + 0.1
   let bottomRightY = margin + 2 * cellHeight + 0.2
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
-  doc.text('Date of Manufacture', bottomRightX, bottomRightY)
-
+  doc.text('Date of', bottomRightX, bottomRightY)
   bottomRightY += 0.15
-  doc.setFontSize(9)
+  doc.text('Manufacture', bottomRightX, bottomRightY)
+
+  bottomRightY += 0.2
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   const dateStr = data.manufactureDate.toLocaleDateString('en-US', {
     year: 'numeric',

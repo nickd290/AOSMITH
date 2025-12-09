@@ -95,7 +95,15 @@ model Release {
   // Document storage
   packingSlipUrl      String?          // PDF storage path
   boxLabelsUrl        String?          // Box labels PDF path
+  invoiceUrl          String?          // Invoice PDF path
   documentsGenerated  String?          // JSON: {"packingSlip": true, "boxLabels": true}
+
+  // Shipping tracking
+  trackingNumber      String?          // FedEx/carrier tracking number
+  shipDate            DateTime?        // Actual ship date
+
+  // impactd122 integration
+  impactJobId         String?          // ID of job created in impactd122
 
   notes               String?
   status              ReleaseStatus    @default(COMPLETED)

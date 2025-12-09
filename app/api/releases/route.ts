@@ -5,6 +5,7 @@ import { savePackingSlip, getPackingSlipFilePath } from '@/lib/documents/packing
 import { saveBoxLabels, getBoxLabelsFilePath } from '@/lib/documents/box-labels'
 import { saveInvoice, getInvoiceFilePath } from '@/lib/documents/invoice'
 import { sendReleaseNotification } from '@/lib/email/sendgrid'
+import { createImpactJob, isImpactd122Configured, getImpactd122CustomerId } from '@/lib/integrations/impactd122'
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,8 +76,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate total units
-    const totalBoxesReleased = requestedPallets * part.boxesPerPallet + requestedBoxes
+    // Calculate total units - ALWAYS use 68 boxes per skid regardless of part settings
+    const BOXES_PER_SKID = 68
+    const totalBoxesReleased = requestedPallets * BOXES_PER_SKID + requestedBoxes
     const totalUnits = totalBoxesReleased * part.unitsPerBox
 
     // Generate release number (format: REL-YYYYMMDD-XXXX)
@@ -121,13 +123,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Update part inventory
+    // Update part inventory - ALWAYS use 68 boxes per skid
     let newPallets = part.currentPallets - requestedPallets
     let newBoxes = part.currentBoxes - requestedBoxes
 
     if (newBoxes < 0) {
       newPallets -= 1
-      newBoxes += part.boxesPerPallet
+      newBoxes += BOXES_PER_SKID
     }
 
     await prisma.part.update({
@@ -175,14 +177,14 @@ export async function POST(request: NextRequest) {
         shipVia: release.shipVia || 'Averitt Collect',
         freightTerms: release.freightTerms || 'Prepaid',
         paymentTerms: release.paymentTerms || '2% 30, Net 60',
-        cartons: release.cartons || (release.pallets * release.part.boxesPerPallet + release.boxes),
+        cartons: release.cartons || (release.pallets * BOXES_PER_SKID + release.boxes),
         weight: release.weight || 0,
         shippingClass: release.shippingClass || '55',
       }
       const packingSlipUrl = await savePackingSlip(release.id, packingSlipData)
 
-      // 2. Generate Box Labels
-      const totalBoxes = release.pallets * release.part.boxesPerPallet + release.boxes
+      // 2. Generate Box Labels - ALWAYS 68 boxes per skid
+      const totalBoxes = release.pallets * BOXES_PER_SKID + release.boxes
       const boxLabelData = {
         partNumber: release.part.partNumber,
         description: release.part.description,
@@ -235,6 +237,7 @@ export async function POST(request: NextRequest) {
         data: {
           packingSlipUrl,
           boxLabelsUrl,
+          invoiceUrl,
           documentsGenerated: new Date().toISOString(),
         },
       })
@@ -269,6 +272,56 @@ export async function POST(request: NextRequest) {
       )
 
       console.log('✅ Documents generated and email sent for release:', release.releaseNumber)
+
+      // 5. Create job in impactd122
+      if (isImpactd122Configured()) {
+        try {
+          const impactResult = await createImpactJob({
+            customerId: getImpactd122CustomerId(),
+            title: `EPG Release - ${release.part.partNumber}`,
+            description: `Release ${release.releaseNumber} - ${release.part.description}`,
+            specs: {
+              source: 'inventory-release-app',
+              releaseNumber: release.releaseNumber,
+              releaseId: release.id,
+              partNumber: release.part.partNumber,
+              partDescription: release.part.description,
+              pallets: release.pallets,
+              boxes: release.boxes,
+              totalUnits: release.totalUnits,
+              customerPONumber: release.customerPONumber,
+              shippingLocation: release.shippingLocation.name,
+              shippingAddress: {
+                address: release.shippingLocation.address,
+                city: release.shippingLocation.city,
+                state: release.shippingLocation.state,
+                zip: release.shippingLocation.zip,
+              },
+              ticketNumber: release.ticketNumber,
+              batchNumber: release.batchNumber,
+              manufactureDate: release.manufactureDate?.toISOString(),
+              shipVia: release.shipVia,
+              freightTerms: release.freightTerms,
+            },
+            quantity: release.totalUnits,
+            customerPONumber: release.customerPONumber,
+            sellPrice: invoiceTotal,
+          })
+
+          if (impactResult.success && impactResult.jobId) {
+            await prisma.release.update({
+              where: { id: release.id },
+              data: { impactJobId: impactResult.jobId },
+            })
+            console.log('✅ Impact job created:', impactResult.jobId)
+          } else {
+            console.warn('⚠️ Failed to create Impact job:', impactResult.error)
+          }
+        } catch (impactError) {
+          console.error('⚠️ Error creating Impact job:', impactError)
+          // Don't fail the release if impactd122 fails
+        }
+      }
     } catch (emailError) {
       console.error('⚠️ Error generating documents or sending email:', emailError)
       // Don't fail the request if email fails - release was created successfully
