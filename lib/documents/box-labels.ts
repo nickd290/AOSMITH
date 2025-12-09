@@ -162,6 +162,14 @@ function generateSingleBoxLabel(
 }
 
 /**
+ * Generate box labels PDF and return as Buffer (for email attachments)
+ */
+export function generateBoxLabelsBuffer(data: BoxLabelData): Buffer {
+  const doc = generateBoxLabels(data)
+  return Buffer.from(doc.output('arraybuffer'))
+}
+
+/**
  * Save box labels PDF to R2 cloud storage (or local filesystem as fallback)
  */
 export async function saveBoxLabels(

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
-import { savePackingSlip, getPackingSlipFilePath } from '@/lib/documents/packing-slip'
-import { saveBoxLabels, getBoxLabelsFilePath } from '@/lib/documents/box-labels'
-import { saveInvoice, getInvoiceFilePath } from '@/lib/documents/invoice'
+import { savePackingSlip, generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
+import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
+import { saveInvoice, generateInvoiceBuffer } from '@/lib/documents/invoice'
 import { sendReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured, getImpactd122CustomerId } from '@/lib/integrations/impactd122'
 
@@ -242,7 +242,11 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // 4. Send Email Notification
+      // 4. Send Email Notification with PDF buffers (no filesystem dependency)
+      const packingSlipBuffer = generatePackingSlipBuffer(packingSlipData)
+      const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
+      const invoiceBuffer = generateInvoiceBuffer(invoiceData)
+
       await sendReleaseNotification(
         {
           releaseNumber: release.releaseNumber,
@@ -258,15 +262,15 @@ export async function POST(request: NextRequest) {
         [
           {
             filename: 'packing-slip.pdf',
-            filePath: getPackingSlipFilePath(release.id),
+            content: packingSlipBuffer.toString('base64'),
           },
           {
             filename: 'box-labels.pdf',
-            filePath: getBoxLabelsFilePath(release.id),
+            content: boxLabelsBuffer.toString('base64'),
           },
           {
             filename: 'invoice.pdf',
-            filePath: getInvoiceFilePath(release.id),
+            content: invoiceBuffer.toString('base64'),
           },
         ]
       )
@@ -358,8 +362,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get releases (all for admin, only own for customer)
-    const whereClause = user.role === 'ADMIN' ? {} : { userId: user.id }
+    // Get all releases for both admin and customer
+    // Customer should see all release history (same as admin)
+    const whereClause = {}
 
     const releases = await prisma.release.findMany({
       where: whereClause,

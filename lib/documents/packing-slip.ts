@@ -267,6 +267,14 @@ export function generatePackingSlip(data: PackingSlipData): jsPDF {
 }
 
 /**
+ * Generate packing slip PDF and return as Buffer (for email attachments)
+ */
+export function generatePackingSlipBuffer(data: PackingSlipData): Buffer {
+  const doc = generatePackingSlip(data)
+  return Buffer.from(doc.output('arraybuffer'))
+}
+
+/**
  * Save packing slip PDF to R2 cloud storage (or local filesystem as fallback)
  */
 export async function savePackingSlip(

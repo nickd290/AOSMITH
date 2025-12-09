@@ -41,10 +41,8 @@ export async function GET(
       return NextResponse.json({ error: 'Release not found' }, { status: 404 })
     }
 
-    // Non-admin users can only see their own releases
-    if (user.role !== 'ADMIN' && release.userId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    // All authenticated users can view any release
+    // (Customer should see all release history)
 
     return NextResponse.json({ release })
   } catch (error) {

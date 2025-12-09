@@ -218,6 +218,14 @@ export function generateInvoice(data: InvoiceData): jsPDF {
 }
 
 /**
+ * Generate invoice PDF and return as Buffer (for email attachments)
+ */
+export function generateInvoiceBuffer(data: InvoiceData): Buffer {
+  const doc = generateInvoice(data)
+  return Buffer.from(doc.output('arraybuffer'))
+}
+
+/**
  * Save invoice PDF to R2 cloud storage (or local filesystem as fallback)
  */
 export async function saveInvoice(

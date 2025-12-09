@@ -9,7 +9,8 @@ if (apiKey) {
 
 export interface EmailAttachment {
   filename: string
-  filePath: string
+  filePath?: string      // File path to read from (legacy)
+  content?: string       // Base64 content directly (preferred)
   type?: string
 }
 
@@ -39,14 +40,27 @@ export async function sendReleaseNotification(
 
   // Prepare attachments for SendGrid
   const sgAttachments = attachments.map((att) => {
-    const content = fs.readFileSync(att.filePath).toString('base64')
+    // Use provided content directly, or read from file path
+    let content = att.content
+    if (!content && att.filePath) {
+      try {
+        content = fs.readFileSync(att.filePath).toString('base64')
+      } catch (err) {
+        console.error(`Failed to read attachment ${att.filename} from ${att.filePath}:`, err)
+        return null
+      }
+    }
+    if (!content) {
+      console.error(`No content available for attachment ${att.filename}`)
+      return null
+    }
     return {
       content,
       filename: att.filename,
       type: att.type || 'application/pdf',
       disposition: 'attachment',
     }
-  })
+  }).filter(Boolean) as Array<{ content: string; filename: string; type: string; disposition: string }>
 
   // Create HTML email body
   const htmlBody = `
