@@ -141,95 +141,99 @@ export async function POST(request: NextRequest) {
     })
 
     // === AUTO-GENERATE ALL DOCUMENTS ===
+    // Build data objects first (no I/O)
+    const packingSlipData = {
+      releaseNumber: release.releaseNumber,
+      ticketNumber: release.ticketNumber || 'N/A',
+      customerPONumber: release.customerPONumber,
+      date: release.createdAt,
+      shipTo: {
+        name: release.shippingLocation.name,
+        address: release.shippingLocation.address,
+        city: release.shippingLocation.city,
+        state: release.shippingLocation.state,
+        zip: release.shippingLocation.zip,
+      },
+      shipFrom: {
+        name: 'Enterprise Print Group',
+        address: '6234 Enterprise Drive',
+        city: 'Knoxville',
+        state: 'TN',
+        zip: '37909',
+        country: 'USA',
+      },
+      lineItems: [
+        {
+          partNumber: release.part.partNumber,
+          description: release.part.description,
+          unitsPerBox: release.part.unitsPerBox,
+          ordered: release.totalUnits,
+          prevShip: 0,
+          shipped: release.totalUnits,
+          backOrdered: 0,
+        },
+      ],
+      shipVia: release.shipVia || 'Averitt Collect',
+      freightTerms: release.freightTerms || 'Prepaid',
+      paymentTerms: release.paymentTerms || '2% 30, Net 60',
+      cartons: release.cartons || (release.pallets * BOXES_PER_SKID + release.boxes),
+      weight: release.weight || 0,
+      shippingClass: release.shippingClass || '55',
+    }
+
+    const totalBoxes = release.pallets * BOXES_PER_SKID + release.boxes
+    const boxLabelData = {
+      partNumber: release.part.partNumber,
+      description: release.part.description,
+      unitsPerBox: release.part.unitsPerBox,
+      batchNumber: release.batchNumber || 'N/A',
+      manufactureDate: release.manufactureDate || release.createdAt,
+      totalBoxes,
+    }
+
+    const invoiceTotal = release.totalUnits * release.part.pricePerUnit
+    const invoiceData = {
+      invoiceNumber: release.releaseNumber,
+      date: release.createdAt,
+      customerPONumber: release.customerPONumber,
+      billTo: {
+        name: 'Enterprise Print Group',
+        address: 'P.O. Box 52870',
+        city: 'Knoxville',
+        state: 'TN',
+        zip: '37950',
+      },
+      billFrom: {
+        name: 'Impact Direct',
+        address: '1550 N Northwest Highway',
+        city: 'Park Ridge',
+        state: 'IL',
+        zip: '60068',
+      },
+      lineItems: [
+        {
+          partNumber: release.part.partNumber,
+          description: release.part.description,
+          quantity: release.totalUnits,
+          unitPrice: release.part.pricePerUnit,
+          total: invoiceTotal,
+        },
+      ],
+      subtotal: invoiceTotal,
+      tax: 0,
+      total: invoiceTotal,
+      paymentTerms: release.paymentTerms || '2% 30, Net 60',
+    }
+
+    // 1. Try to save documents to storage (optional - non-blocking)
+    let packingSlipUrl: string | null = null
+    let boxLabelsUrl: string | null = null
+    let invoiceUrl: string | null = null
+
     try {
-      // 1. Generate Packing Slip
-      const packingSlipData = {
-        releaseNumber: release.releaseNumber,
-        ticketNumber: release.ticketNumber || 'N/A',
-        customerPONumber: release.customerPONumber,
-        date: release.createdAt,
-        shipTo: {
-          name: release.shippingLocation.name,
-          address: release.shippingLocation.address,
-          city: release.shippingLocation.city,
-          state: release.shippingLocation.state,
-          zip: release.shippingLocation.zip,
-        },
-        shipFrom: {
-          name: 'Enterprise Print Group',
-          address: '6234 Enterprise Drive',
-          city: 'Knoxville',
-          state: 'TN',
-          zip: '37909',
-          country: 'USA',
-        },
-        lineItems: [
-          {
-            partNumber: release.part.partNumber,
-            description: release.part.description,
-            unitsPerBox: release.part.unitsPerBox,
-            ordered: release.totalUnits,
-            prevShip: 0,
-            shipped: release.totalUnits,
-            backOrdered: 0,
-          },
-        ],
-        shipVia: release.shipVia || 'Averitt Collect',
-        freightTerms: release.freightTerms || 'Prepaid',
-        paymentTerms: release.paymentTerms || '2% 30, Net 60',
-        cartons: release.cartons || (release.pallets * BOXES_PER_SKID + release.boxes),
-        weight: release.weight || 0,
-        shippingClass: release.shippingClass || '55',
-      }
-      const packingSlipUrl = await savePackingSlip(release.id, packingSlipData)
-
-      // 2. Generate Box Labels - ALWAYS 68 boxes per skid
-      const totalBoxes = release.pallets * BOXES_PER_SKID + release.boxes
-      const boxLabelData = {
-        partNumber: release.part.partNumber,
-        description: release.part.description,
-        unitsPerBox: release.part.unitsPerBox,
-        batchNumber: release.batchNumber || 'N/A',
-        manufactureDate: release.manufactureDate || release.createdAt,
-        totalBoxes,
-      }
-      const boxLabelsUrl = await saveBoxLabels(release.id, boxLabelData)
-
-      // 3. Generate Invoice
-      const invoiceTotal = release.totalUnits * release.part.pricePerUnit
-      const invoiceData = {
-        invoiceNumber: release.releaseNumber,
-        date: release.createdAt,
-        customerPONumber: release.customerPONumber,
-        billTo: {
-          name: 'Enterprise Print Group',
-          address: 'P.O. Box 52870',
-          city: 'Knoxville',
-          state: 'TN',
-          zip: '37950',
-        },
-        billFrom: {
-          name: 'Impact Direct',
-          address: '1550 N Northwest Highway',
-          city: 'Park Ridge',
-          state: 'IL',
-          zip: '60068',
-        },
-        lineItems: [
-          {
-            partNumber: release.part.partNumber,
-            description: release.part.description,
-            quantity: release.totalUnits,
-            unitPrice: release.part.pricePerUnit,
-            total: invoiceTotal,
-          },
-        ],
-        subtotal: invoiceTotal,
-        tax: 0,
-        total: invoiceTotal,
-        paymentTerms: release.paymentTerms || '2% 30, Net 60',
-      }
-      const invoiceUrl = await saveInvoice(release.id, invoiceData)
+      packingSlipUrl = await savePackingSlip(release.id, packingSlipData)
+      boxLabelsUrl = await saveBoxLabels(release.id, boxLabelData)
+      invoiceUrl = await saveInvoice(release.id, invoiceData)
 
       // Update release with document URLs
       await prisma.release.update({
@@ -241,8 +245,14 @@ export async function POST(request: NextRequest) {
           documentsGenerated: new Date().toISOString(),
         },
       })
+      console.log('✅ Documents saved to storage for release:', release.releaseNumber)
+    } catch (saveError) {
+      console.warn('⚠️ Document storage failed (email will still be sent):', saveError)
+      // Continue - email is more important than file storage
+    }
 
-      // 4. Send Email Notification with PDF buffers (no filesystem dependency)
+    // 2. Send Email Notification with PDF buffers (no filesystem dependency)
+    try {
       const packingSlipBuffer = generatePackingSlipBuffer(packingSlipData)
       const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
       const invoiceBuffer = generateInvoiceBuffer(invoiceData)
@@ -275,60 +285,60 @@ export async function POST(request: NextRequest) {
         ]
       )
 
-      console.log('✅ Documents generated and email sent for release:', release.releaseNumber)
-
-      // 5. Create job in impactd122
-      if (isImpactd122Configured()) {
-        try {
-          const impactResult = await createImpactJob({
-            customerId: getImpactd122CustomerId(),
-            title: `EPG Release - ${release.part.partNumber}`,
-            description: `Release ${release.releaseNumber} - ${release.part.description}`,
-            specs: {
-              source: 'inventory-release-app',
-              releaseNumber: release.releaseNumber,
-              releaseId: release.id,
-              partNumber: release.part.partNumber,
-              partDescription: release.part.description,
-              pallets: release.pallets,
-              boxes: release.boxes,
-              totalUnits: release.totalUnits,
-              customerPONumber: release.customerPONumber,
-              shippingLocation: release.shippingLocation.name,
-              shippingAddress: {
-                address: release.shippingLocation.address,
-                city: release.shippingLocation.city,
-                state: release.shippingLocation.state,
-                zip: release.shippingLocation.zip,
-              },
-              ticketNumber: release.ticketNumber,
-              batchNumber: release.batchNumber,
-              manufactureDate: release.manufactureDate?.toISOString(),
-              shipVia: release.shipVia,
-              freightTerms: release.freightTerms,
-            },
-            quantity: release.totalUnits,
-            customerPONumber: release.customerPONumber,
-            sellPrice: invoiceTotal,
-          })
-
-          if (impactResult.success && impactResult.jobId) {
-            await prisma.release.update({
-              where: { id: release.id },
-              data: { impactJobId: impactResult.jobId },
-            })
-            console.log('✅ Impact job created:', impactResult.jobId)
-          } else {
-            console.warn('⚠️ Failed to create Impact job:', impactResult.error)
-          }
-        } catch (impactError) {
-          console.error('⚠️ Error creating Impact job:', impactError)
-          // Don't fail the release if impactd122 fails
-        }
-      }
+      console.log('✅ Email sent for release:', release.releaseNumber)
     } catch (emailError) {
-      console.error('⚠️ Error generating documents or sending email:', emailError)
-      // Don't fail the request if email fails - release was created successfully
+      console.error('❌ Email sending failed:', emailError)
+      // Don't fail the request - release was created successfully
+    }
+
+    // 3. Create job in impactd122
+    if (isImpactd122Configured()) {
+      try {
+        const impactResult = await createImpactJob({
+          customerId: getImpactd122CustomerId(),
+          title: `EPG Release - ${release.part.partNumber}`,
+          description: `Release ${release.releaseNumber} - ${release.part.description}`,
+          specs: {
+            source: 'inventory-release-app',
+            releaseNumber: release.releaseNumber,
+            releaseId: release.id,
+            partNumber: release.part.partNumber,
+            partDescription: release.part.description,
+            pallets: release.pallets,
+            boxes: release.boxes,
+            totalUnits: release.totalUnits,
+            customerPONumber: release.customerPONumber,
+            shippingLocation: release.shippingLocation.name,
+            shippingAddress: {
+              address: release.shippingLocation.address,
+              city: release.shippingLocation.city,
+              state: release.shippingLocation.state,
+              zip: release.shippingLocation.zip,
+            },
+            ticketNumber: release.ticketNumber,
+            batchNumber: release.batchNumber,
+            manufactureDate: release.manufactureDate?.toISOString(),
+            shipVia: release.shipVia,
+            freightTerms: release.freightTerms,
+          },
+          quantity: release.totalUnits,
+          customerPONumber: release.customerPONumber,
+          sellPrice: invoiceTotal,
+        })
+
+        if (impactResult.success && impactResult.jobId) {
+          await prisma.release.update({
+            where: { id: release.id },
+            data: { impactJobId: impactResult.jobId },
+          })
+          console.log('✅ Impact job created:', impactResult.jobId)
+        } else {
+          console.warn('⚠️ Failed to create Impact job:', impactResult.error)
+        }
+      } catch (impactError) {
+        console.error('⚠️ Error creating Impact job:', impactError)
+        // Don't fail the release if impactd122 fails
+      }
     }
 
     return NextResponse.json({ release })
