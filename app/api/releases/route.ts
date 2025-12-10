@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
 import { savePackingSlip, generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
 import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
-import { saveInvoice, generateInvoiceBuffer } from '@/lib/documents/invoice'
+import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknowledgement'
 import { sendReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured, getImpactd122CustomerId } from '@/lib/integrations/impactd122'
 
@@ -194,19 +194,21 @@ export async function POST(request: NextRequest) {
       totalBoxes,
     }
 
-    const invoiceTotal = release.totalUnits * release.part.pricePerUnit
-    const invoiceData = {
-      invoiceNumber: release.releaseNumber,
+    const orderTotal = release.totalUnits * release.part.pricePerUnit
+    const orderAckData = {
+      orderNumber: release.releaseNumber,
       date: release.createdAt,
       customerPONumber: release.customerPONumber,
-      billTo: {
-        name: 'Enterprise Print Group',
-        address: 'P.O. Box 52870',
-        city: 'Knoxville',
-        state: 'TN',
-        zip: '37950',
+      shipDate: release.shipDate || release.createdAt,
+      etaDeliveryDate: release.etaDeliveryDate,
+      shipTo: {
+        name: release.shippingLocation.name,
+        address: release.shippingLocation.address,
+        city: release.shippingLocation.city,
+        state: release.shippingLocation.state,
+        zip: release.shippingLocation.zip,
       },
-      billFrom: {
+      shipFrom: {
         name: 'Impact Direct',
         address: '1550 N Northwest Highway',
         city: 'Park Ridge',
@@ -219,24 +221,21 @@ export async function POST(request: NextRequest) {
           description: release.part.description,
           quantity: release.totalUnits,
           unitPrice: release.part.pricePerUnit,
-          total: invoiceTotal,
+          total: orderTotal,
         },
       ],
-      subtotal: invoiceTotal,
-      tax: 0,
-      total: invoiceTotal,
+      subtotal: orderTotal,
+      total: orderTotal,
       paymentTerms: release.paymentTerms || '2% 30, Net 60',
     }
 
     // 1. Try to save documents to storage (optional - non-blocking)
     let packingSlipUrl: string | null = null
     let boxLabelsUrl: string | null = null
-    let invoiceUrl: string | null = null
 
     try {
       packingSlipUrl = await savePackingSlip(release.id, packingSlipData)
       boxLabelsUrl = await saveBoxLabels(release.id, boxLabelData)
-      invoiceUrl = await saveInvoice(release.id, invoiceData)
 
       // Update release with document URLs
       await prisma.release.update({
@@ -244,7 +243,6 @@ export async function POST(request: NextRequest) {
         data: {
           packingSlipUrl,
           boxLabelsUrl,
-          invoiceUrl,
           documentsGenerated: new Date().toISOString(),
         },
       })
@@ -255,10 +253,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Send Email Notification with PDF buffers (no filesystem dependency)
+    // Send: Packing Slip, Box Labels, Order Acknowledgement (NOT Invoice)
+    // Invoice will be sent separately on Ship Date
     try {
       const packingSlipBuffer = generatePackingSlipBuffer(packingSlipData)
       const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
-      const invoiceBuffer = generateInvoiceBuffer(invoiceData)
+      const orderAckBuffer = generateOrderAcknowledgementBuffer(orderAckData)
 
       await sendReleaseNotification(
         {
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
           totalUnits: release.totalUnits,
           customerPONumber: release.customerPONumber,
           shippingLocation: release.shippingLocation.name,
-          invoiceTotal: `$${invoiceTotal.toFixed(2)}`,
+          invoiceTotal: `$${orderTotal.toFixed(2)}`,
         },
         [
           {
@@ -282,8 +282,8 @@ export async function POST(request: NextRequest) {
             content: boxLabelsBuffer.toString('base64'),
           },
           {
-            filename: 'invoice.pdf',
-            content: invoiceBuffer.toString('base64'),
+            filename: 'order-acknowledgement.pdf',
+            content: orderAckBuffer.toString('base64'),
           },
         ]
       )
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
           },
           quantity: release.totalUnits,
           customerPONumber: release.customerPONumber,
-          sellPrice: invoiceTotal,
+          sellPrice: orderTotal,
         })
 
         if (impactResult.success && impactResult.jobId) {

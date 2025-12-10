@@ -104,6 +104,10 @@ model Release {
   shipDate            DateTime?        // Scheduled ship date (pickup date)
   etaDeliveryDate     DateTime?        // Estimated delivery date (5 business days from ship date)
 
+  // Invoice tracking
+  invoiceSent         Boolean          @default(false)  // Whether invoice has been sent
+  invoiceSentAt       DateTime?        // When invoice was sent
+
   // impactd122 integration
   impactJobId         String?          // ID of job created in impactd122
 
