@@ -5,7 +5,7 @@ import { savePackingSlip, generatePackingSlipBuffer } from '@/lib/documents/pack
 import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
 import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknowledgement'
 import { sendReleaseNotification } from '@/lib/email/sendgrid'
-import { createImpactJob, isImpactd122Configured, getImpactd122CustomerId } from '@/lib/integrations/impactd122'
+import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
 
 export async function POST(request: NextRequest) {
   try {
@@ -294,23 +294,29 @@ export async function POST(request: NextRequest) {
       // Don't fail the request - release was created successfully
     }
 
-    // 3. Create job in impactd122
+    // 3. Create job in impactd122 via webhook
     if (isImpactd122Configured()) {
       try {
         const impactResult = await createImpactJob({
-          customerId: getImpactd122CustomerId(),
+          // Required webhook fields
+          externalJobId: release.id,
+          jobNo: release.releaseNumber,
+          companyName: 'EPrint Group',
+
+          // Optional fields
           title: `EPG Release - ${release.part.partNumber}`,
-          description: `Release ${release.releaseNumber} - ${release.part.description}`,
+          customerPONumber: release.customerPONumber,
+          quantity: release.totalUnits,
+          status: 'PO_RECEIVED',
+          createdAt: new Date().toISOString(),
           specs: {
             source: 'inventory-release-app',
-            releaseNumber: release.releaseNumber,
             releaseId: release.id,
             partNumber: release.part.partNumber,
             partDescription: release.part.description,
             pallets: release.pallets,
             boxes: release.boxes,
             totalUnits: release.totalUnits,
-            customerPONumber: release.customerPONumber,
             shippingLocation: release.shippingLocation.name,
             shippingAddress: {
               address: release.shippingLocation.address,
@@ -323,10 +329,8 @@ export async function POST(request: NextRequest) {
             manufactureDate: release.manufactureDate?.toISOString(),
             shipVia: release.shipVia,
             freightTerms: release.freightTerms,
+            sellPrice: orderTotal,
           },
-          quantity: release.totalUnits,
-          customerPONumber: release.customerPONumber,
-          sellPrice: orderTotal,
         })
 
         if (impactResult.success && impactResult.jobId) {

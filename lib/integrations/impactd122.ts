@@ -1,17 +1,25 @@
 // impactd122 Integration Client
-// Creates jobs in impactd122 when releases are created
+// Creates jobs in impactd122 when releases are created via webhook
 
 const IMPACTD122_API_URL = process.env.IMPACTD122_API_URL
 const IMPACTD122_CUSTOMER_ID = process.env.IMPACTD122_CUSTOMER_ID
+const IMPACTD122_WEBHOOK_SECRET = process.env.IMPACTD122_WEBHOOK_SECRET
 
 export interface ImpactJobPayload {
-  customerId: string
-  title: string
-  description: string
-  specs: Record<string, unknown>
-  quantity: number
-  customerPONumber: string
-  sellPrice?: number
+  // Required fields for webhook
+  externalJobId: string      // Release ID in our system
+  jobNo: string              // Release number (e.g., REL-20241211-0001)
+  companyName: string        // Company name for lookup/creation in ImpactD122
+
+  // Optional fields
+  title?: string
+  customerPONumber?: string
+  sizeName?: string
+  quantity?: number
+  specs?: Record<string, unknown>
+  status?: string
+  deliveryDate?: string
+  createdAt?: string
 }
 
 export interface ImpactJobResult {
@@ -24,7 +32,7 @@ export interface ImpactJobResult {
  * Check if impactd122 integration is configured
  */
 export function isImpactd122Configured(): boolean {
-  return !!(IMPACTD122_API_URL && IMPACTD122_CUSTOMER_ID)
+  return !!(IMPACTD122_API_URL && IMPACTD122_WEBHOOK_SECRET)
 }
 
 /**
@@ -35,7 +43,7 @@ export function getImpactd122CustomerId(): string {
 }
 
 /**
- * Create a job in impactd122
+ * Create a job in impactd122 via webhook endpoint
  */
 export async function createImpactJob(payload: ImpactJobPayload): Promise<ImpactJobResult> {
   if (!IMPACTD122_API_URL) {
@@ -43,10 +51,18 @@ export async function createImpactJob(payload: ImpactJobPayload): Promise<Impact
     return { success: false, error: 'Not configured' }
   }
 
+  if (!IMPACTD122_WEBHOOK_SECRET) {
+    console.log('[impactd122] Webhook secret not configured, skipping')
+    return { success: false, error: 'Webhook secret not configured' }
+  }
+
   try {
-    const response = await fetch(`${IMPACTD122_API_URL}/api/jobs`, {
+    const response = await fetch(`${IMPACTD122_API_URL}/api/webhooks/jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': IMPACTD122_WEBHOOK_SECRET,
+      },
       body: JSON.stringify(payload),
     })
 
@@ -56,10 +72,10 @@ export async function createImpactJob(payload: ImpactJobPayload): Promise<Impact
     }
 
     const data = await response.json()
-    console.log(`[impactd122] Job created: ${data.id}`)
-    return { success: true, jobId: data.id }
+    console.log(`[impactd122] Job created via webhook: ${data.jobId} (${data.jobNo})`)
+    return { success: true, jobId: data.jobId }
   } catch (error) {
-    console.error('[impactd122] Error creating job:', error)
+    console.error('[impactd122] Error creating job via webhook:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
