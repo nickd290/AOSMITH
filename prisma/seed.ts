@@ -34,16 +34,22 @@ async function main() {
 
   console.log('✅ Users created:', { admin: admin.email, customer: customer.email })
 
-  // Create part numbers
+  // Create part numbers with cost basis and vendor info
   const part1 = await prisma.part.upsert({
     where: { partNumber: '100307705' },
-    update: {},
+    update: {
+      costBasisPerUnit: 0.2417,  // Buy cost from ThreeZ
+      vendorName: 'ThreeZ',      // Vendor supplies paper
+      description: 'MANUAL, 36 PAGE, RES, GAS, UNBRANDED',
+    },
     create: {
       partNumber: '100307705',
-      description: '36-page manual',
+      description: 'MANUAL, 36 PAGE, RES, GAS, UNBRANDED',
       unitsPerBox: 120,
       boxesPerPallet: 68,
-      pricePerUnit: 0.2859,
+      pricePerUnit: 0.2859,       // Sell price to customer
+      costBasisPerUnit: 0.2417,   // Buy cost from ThreeZ
+      vendorName: 'ThreeZ',       // Vendor supplies paper
       annualOrder: 100000,
       currentPallets: 50, // Starting inventory
       currentBoxes: 10,
@@ -52,13 +58,19 @@ async function main() {
 
   const part2 = await prisma.part.upsert({
     where: { partNumber: '100309797' },
-    update: {},
+    update: {
+      costBasisPerUnit: 0.1956,  // Buy cost from ThreeZ
+      vendorName: 'ThreeZ',      // Vendor supplies paper
+      description: 'MANUAL, 28 PAGE, RES, ELECT, UNBRANDED',
+    },
     create: {
       partNumber: '100309797',
-      description: '28-page manual',
+      description: 'MANUAL, 28 PAGE, RES, ELECT, UNBRANDED',
       unitsPerBox: 130,
       boxesPerPallet: 68,
-      pricePerUnit: 0.2225,
+      pricePerUnit: 0.2225,       // Sell price to customer
+      costBasisPerUnit: 0.1956,   // Buy cost from ThreeZ
+      vendorName: 'ThreeZ',       // Vendor supplies paper
       annualOrder: 200000,
       currentPallets: 75, // Starting inventory
       currentBoxes: 5,

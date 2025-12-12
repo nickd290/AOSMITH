@@ -34,17 +34,19 @@ enum Role {
 
 // Part number definitions
 model Part {
-  id            String   @id @default(cuid())
-  partNumber    String   @unique
-  description   String
-  unitsPerBox   Int
-  boxesPerPallet Int     @default(68)
-  pricePerUnit  Float
-  annualOrder   Int
-  currentPallets Int     @default(0)
-  currentBoxes   Int     @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  partNumber       String   @unique
+  description      String
+  unitsPerBox      Int
+  boxesPerPallet   Int      @default(68)
+  pricePerUnit     Float                    // Sell price to customer
+  costBasisPerUnit Float?                   // Buy cost from vendor (e.g., ThreeZ)
+  vendorName       String?                  // Vendor who supplies this part
+  annualOrder      Int
+  currentPallets   Int      @default(0)
+  currentBoxes     Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   releases      Release[]
   productions   Production[]

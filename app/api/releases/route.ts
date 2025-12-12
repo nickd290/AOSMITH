@@ -330,6 +330,18 @@ export async function POST(request: NextRequest) {
             shipVia: release.shipVia,
             freightTerms: release.freightTerms,
             sellPrice: orderTotal,
+
+            // Cost basis and vendor info for PO creation
+            costBasisPerUnit: release.part.costBasisPerUnit,
+            buyCost: release.part.costBasisPerUnit
+              ? release.totalUnits * release.part.costBasisPerUnit
+              : undefined,
+            vendorName: release.part.vendorName,
+            paperSource: release.part.vendorName ? 'VENDOR' : undefined,
+
+            // PDFs for ThreeZ email (base64 encoded)
+            packingSlipPdf: packingSlipBuffer.toString('base64'),
+            boxLabelsPdf: boxLabelsBuffer.toString('base64'),
           },
         })
 

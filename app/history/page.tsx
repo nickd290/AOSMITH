@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2 } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2 } from 'lucide-react'
 
 interface Release {
   id: string
@@ -67,6 +67,9 @@ export default function HistoryPage() {
 
   // Download state
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null)
+
+  // Delete state
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -227,6 +230,36 @@ export default function HistoryPage() {
       alert('Failed to download document. Please try again.')
     } finally {
       setDownloadingDoc(null)
+    }
+  }
+
+  const deleteRelease = async () => {
+    if (!selectedRelease) return
+
+    if (!confirm(`Are you sure you want to delete release ${selectedRelease.releaseNumber}?\n\nThis will restore ${selectedRelease.pallets} pallets to inventory.\n\nThis action cannot be undone.`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/releases/${selectedRelease.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete release')
+      }
+
+      // Remove from list and close sidebar
+      setReleases(releases.filter(r => r.id !== selectedRelease.id))
+      setSelectedRelease(null)
+      alert('Release deleted successfully. Inventory has been restored.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete release')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -676,6 +709,23 @@ export default function HistoryPage() {
                     Released by: <span className="font-medium">{selectedRelease.user.name}</span>
                   </p>
                   <p className="text-xs text-gray-500">{selectedRelease.user.email}</p>
+                </div>
+              )}
+
+              {/* Delete Button - Admin Only, Non-Shipped */}
+              {user?.role === 'ADMIN' && selectedRelease.status !== 'SHIPPED' && (
+                <div className="mt-6 pt-4 border-t border-red-200">
+                  <button
+                    onClick={deleteRelease}
+                    disabled={isDeleting}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isDeleting ? 'Deleting...' : 'Delete Release'}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    This will restore inventory and cannot be undone
+                  </p>
                 </div>
               )}
             </div>

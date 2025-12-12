@@ -128,3 +128,65 @@ export async function PATCH(
     return NextResponse.json({ error: 'An error occurred' }, { status: 500 })
   }
 }
+
+// DELETE - Delete release and restore inventory (admin only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ releaseId: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const user = await getUserFromToken(token)
+
+    if (!user || user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
+    const { releaseId } = await params
+
+    // Get the release with part info
+    const release = await prisma.release.findUnique({
+      where: { id: releaseId },
+      include: { part: true },
+    })
+
+    if (!release) {
+      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
+    }
+
+    // Prevent deleting shipped releases
+    if (release.status === 'SHIPPED') {
+      return NextResponse.json(
+        { error: 'Cannot delete shipped releases' },
+        { status: 400 }
+      )
+    }
+
+    // Restore inventory (reverse the release)
+    await prisma.part.update({
+      where: { id: release.partId },
+      data: {
+        currentPallets: { increment: release.pallets },
+        currentBoxes: { increment: release.boxes },
+      },
+    })
+
+    // Delete the release
+    await prisma.release.delete({
+      where: { id: releaseId },
+    })
+
+    console.log(`🗑️ Release ${release.releaseNumber} deleted, inventory restored: +${release.pallets} pallets, +${release.boxes} boxes`)
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting release:', error)
+    return NextResponse.json({ error: 'An error occurred' }, { status: 500 })
+  }
+}
