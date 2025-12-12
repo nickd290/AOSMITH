@@ -252,14 +252,15 @@ export async function POST(request: NextRequest) {
       // Continue - email is more important than file storage
     }
 
-    // 2. Send Email Notification with PDF buffers (no filesystem dependency)
+    // 2. Generate PDF buffers (needed for both email and ImpactD122 webhook)
+    const packingSlipBuffer = generatePackingSlipBuffer(packingSlipData)
+    const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
+    const orderAckBuffer = generateOrderAcknowledgementBuffer(orderAckData)
+
+    // 3. Send Email Notification with PDF buffers (no filesystem dependency)
     // Send: Packing Slip, Box Labels, Order Acknowledgement (NOT Invoice)
     // Invoice will be sent separately on Ship Date
     try {
-      const packingSlipBuffer = generatePackingSlipBuffer(packingSlipData)
-      const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
-      const orderAckBuffer = generateOrderAcknowledgementBuffer(orderAckData)
-
       await sendReleaseNotification(
         {
           releaseNumber: release.releaseNumber,
@@ -294,7 +295,7 @@ export async function POST(request: NextRequest) {
       // Don't fail the request - release was created successfully
     }
 
-    // 3. Create job in impactd122 via webhook
+    // 4. Create job in impactd122 via webhook
     if (isImpactd122Configured()) {
       try {
         const impactResult = await createImpactJob({
