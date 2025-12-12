@@ -333,12 +333,11 @@ export async function POST(request: NextRequest) {
             sellPrice: orderTotal,
 
             // Cost basis and vendor info for PO creation
-            costBasisPerUnit: release.part.costBasisPerUnit,
-            buyCost: release.part.costBasisPerUnit
-              ? release.totalUnits * release.part.costBasisPerUnit
-              : undefined,
-            vendorName: release.part.vendorName,
-            paperSource: release.part.vendorName ? 'VENDOR' : undefined,
+            // Default to ThreeZ for all EPrint Group releases (inventory stored at ThreeZ)
+            costBasisPerUnit: release.part.costBasisPerUnit || 0.24,
+            buyCost: release.totalUnits * (release.part.costBasisPerUnit || 0.24),
+            vendorName: release.part.vendorName || 'ThreeZ',
+            paperSource: 'VENDOR',
 
             // PDFs for ThreeZ email (base64 encoded)
             packingSlipPdf: packingSlipBuffer.toString('base64'),
