@@ -7,8 +7,6 @@ interface BoxLabelData {
   description: string
   unitsPerBox: number
   batchNumber: string
-  shipDate: Date
-  etaDeliveryDate?: Date | null
   totalBoxes: number
 }
 
@@ -140,37 +138,6 @@ function generateSingleBoxLabel(
   // Split description if too long (convert to uppercase to match sample)
   const descLines = doc.splitTextToSize(data.description.toUpperCase(), cellWidth - 0.3)
   doc.text(descLines, bottomLeftX, bottomLeftY)
-
-  // === BOTTOM RIGHT: Ship Date & ETA ===
-  const bottomRightX = pageWidth / 2 + 0.1
-  let bottomRightY = margin + 2 * cellHeight + 0.18
-
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Ship Date:', bottomRightX, bottomRightY)
-
-  doc.setFont('helvetica', 'normal')
-  const shipDateStr = data.shipDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  doc.text(shipDateStr, bottomRightX + 0.7, bottomRightY)
-
-  // Show ETA Delivery Date
-  if (data.etaDeliveryDate) {
-    bottomRightY += 0.25
-    doc.setFont('helvetica', 'bold')
-    doc.text('ETA Delivery:', bottomRightX, bottomRightY)
-
-    doc.setFont('helvetica', 'normal')
-    const etaDateStr = data.etaDeliveryDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-    doc.text(etaDateStr, bottomRightX + 0.9, bottomRightY)
-  }
 }
 
 /**
