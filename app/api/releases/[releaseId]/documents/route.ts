@@ -113,7 +113,7 @@ export async function POST(
         description: release.part.description,
         unitsPerBox: release.part.unitsPerBox,
         batchNumber: release.batchNumber || 'N/A',
-        manufactureDate: release.manufactureDate || release.createdAt,
+        manufactureDate: release.shipDate || release.createdAt,
         totalBoxes,
       }
 
