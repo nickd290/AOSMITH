@@ -8,6 +8,7 @@ interface BoxLabelData {
   unitsPerBox: number
   batchNumber: string
   totalBoxes: number
+  manufactureDate?: Date
 }
 
 /**
@@ -138,6 +139,22 @@ function generateSingleBoxLabel(
   // Split description if too long (convert to uppercase to match sample)
   const descLines = doc.splitTextToSize(data.description.toUpperCase(), cellWidth - 0.3)
   doc.text(descLines, bottomLeftX, bottomLeftY)
+
+  // === BOTTOM RIGHT: Manufacture Date ===
+  if (data.manufactureDate) {
+    const bottomRightX = pageWidth / 2 + 0.1
+    let bottomRightY = margin + 2 * cellHeight + 0.2
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Date of Manufacture', bottomRightX, bottomRightY)
+
+    bottomRightY += 0.25
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'normal')
+    const dateStr = `${(data.manufactureDate.getMonth() + 1).toString().padStart(2, '0')}/${data.manufactureDate.getDate().toString().padStart(2, '0')}/${data.manufactureDate.getFullYear()}`
+    doc.text(dateStr, bottomRightX, bottomRightY)
+  }
 }
 
 /**
