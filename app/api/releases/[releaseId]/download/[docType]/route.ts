@@ -120,8 +120,7 @@ export async function GET(
         description: release.part.description,
         unitsPerBox: release.part.unitsPerBox,
         batchNumber: release.batchNumber || 'N/A',
-        shipDate: release.shipDate || release.createdAt,
-        etaDeliveryDate: release.etaDeliveryDate,
+        manufactureDate: release.shipDate || release.createdAt,
         totalBoxes,
       }
 
