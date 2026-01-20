@@ -266,7 +266,7 @@ export default function DashboardPage() {
         {/* Info Box */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-2">
-            Standard Release: 5 Pallets (340 boxes)
+            Standard Release: 5 Pallets (255 boxes)
           </h3>
           <p className="text-sm text-blue-800">
             Click "Release Inventory" above to start a new release order. Packing slips will be

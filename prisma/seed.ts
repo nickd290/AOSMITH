@@ -41,12 +41,14 @@ async function main() {
       costBasisPerUnit: 0.2417,  // Buy cost from ThreeZ
       vendorName: 'ThreeZ',      // Vendor supplies paper
       description: 'MANUAL, 36 PAGE, RES, GAS, UNBRANDED',
+      unitsPerBox: 130,          // Updated 2025-01-20
+      boxesPerPallet: 51,        // Updated 2025-01-20: 3 layers high per new height requirement
     },
     create: {
       partNumber: '100307705',
       description: 'MANUAL, 36 PAGE, RES, GAS, UNBRANDED',
-      unitsPerBox: 120,
-      boxesPerPallet: 68,
+      unitsPerBox: 130,          // Updated 2025-01-20 (was 120)
+      boxesPerPallet: 51,        // 3 layers high per new height requirement (was 68)
       pricePerUnit: 0.2859,       // Sell price to customer
       costBasisPerUnit: 0.2417,   // Buy cost from ThreeZ
       vendorName: 'ThreeZ',       // Vendor supplies paper
@@ -62,12 +64,14 @@ async function main() {
       costBasisPerUnit: 0.1956,  // Buy cost from ThreeZ
       vendorName: 'ThreeZ',      // Vendor supplies paper
       description: 'MANUAL, 28 PAGE, RES, ELECT, UNBRANDED',
+      unitsPerBox: 130,          // Updated 2025-01-20
+      boxesPerPallet: 51,        // Updated 2025-01-20: 3 layers high per new height requirement
     },
     create: {
       partNumber: '100309797',
       description: 'MANUAL, 28 PAGE, RES, ELECT, UNBRANDED',
       unitsPerBox: 130,
-      boxesPerPallet: 68,
+      boxesPerPallet: 51,        // 3 layers high per new height requirement (was 68)
       pricePerUnit: 0.2225,       // Sell price to customer
       costBasisPerUnit: 0.1956,   // Buy cost from ThreeZ
       vendorName: 'ThreeZ',       // Vendor supplies paper
