@@ -41,4 +41,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
-// Trigger rebuild Tue Jan 20 17:47:43 EST 2026
+// Trigger rebuild v2 - fixed import path
