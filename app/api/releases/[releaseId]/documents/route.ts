@@ -73,6 +73,7 @@ export async function POST(
           city: release.shippingLocation.city,
           state: release.shippingLocation.state,
           zip: release.shippingLocation.zip,
+          instructions: release.shippingLocation.instructions || undefined,
         },
         shipFrom: {
           name: 'Enterprise Print Group',

@@ -15,6 +15,7 @@ interface PackingSlipData {
     city: string
     state: string
     zip: string
+    instructions?: string  // Special shipping instructions (e.g., "HEAT TREATED PALLETS")
   }
   shipFrom: {
     name: string
@@ -142,6 +143,18 @@ export function generatePackingSlip(data: PackingSlipData): jsPDF {
   doc.text(data.shipTo.address, margin, currentY)
   currentY += 12
   doc.text(`${data.shipTo.city}, ${data.shipTo.state} ${data.shipTo.zip}`, margin, currentY)
+
+  // Special shipping instructions (displayed prominently in bold red)
+  if (data.shipTo.instructions) {
+    currentY += 15
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(180, 0, 0)  // Dark red for visibility
+    doc.text(`*** ${data.shipTo.instructions} ***`, margin, currentY)
+    doc.setTextColor(0, 0, 0)  // Reset to black
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+  }
 
   // From: (right column)
   let fromY = currentY - 39

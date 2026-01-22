@@ -58,7 +58,7 @@ Inventory release management system for JD Graphic <-> ePrint Group <-> AO Smith
 |-------|------------|-----------|
 | `User` | id, email, password, name, role | releases[], productions[] |
 | `Part` | partNumber, description, unitsPerBox, pricePerUnit, currentPallets, currentBoxes | releases[], productions[] |
-| `ShippingLocation` | name, address, city, state, zip | releases[] |
+| `ShippingLocation` | name, address, city, state, zip, instructions | releases[] |
 | `Release` | releaseNumber, partId, shippingLocationId, pallets, boxes, customerPONumber, status | part, shippingLocation, user |
 | `Production` | partId, pallets, boxes, totalUnits | part, user |
 

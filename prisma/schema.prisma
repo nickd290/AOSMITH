@@ -56,15 +56,16 @@ model Part {
 
 // Shipping locations (AO Smith facilities)
 model ShippingLocation {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  address   String
-  city      String
-  state     String
-  zip       String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String   @unique
+  address      String
+  city         String
+  state        String
+  zip          String
+  instructions String?  // Special shipping instructions (e.g., "HEAT TREATED PALLETS")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   releases  Release[]
 }

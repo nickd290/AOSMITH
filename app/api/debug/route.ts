@@ -14,11 +14,36 @@ export async function GET() {
       },
     })
 
+    // Get parts with key fields
+    const parts = await prisma.part.findMany({
+      select: {
+        id: true,
+        partNumber: true,
+        description: true,
+        unitsPerBox: true,
+        boxesPerPallet: true,
+      },
+      orderBy: { partNumber: 'asc' },
+    })
+
+    // Get shipping locations
+    const shippingLocations = await prisma.shippingLocation.findMany({
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        state: true,
+      },
+      orderBy: { name: 'asc' },
+    })
+
     return NextResponse.json({
       status: 'ok',
       database: 'connected',
       userCount,
       users,
+      parts,
+      shippingLocations,
       env: {
         hasJwtSecret: !!process.env.JWT_SECRET,
         nodeEnv: process.env.NODE_ENV,

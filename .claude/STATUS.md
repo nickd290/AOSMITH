@@ -1,7 +1,7 @@
 # Inventory Release App - Status
 
 ## Current Goal
-Updated part 100307705 boxes per pallet for new height requirement
+Added shipping location instructions support and Juarez location
 
 ## Active Sprint
 _No active sprint_
@@ -10,6 +10,10 @@ _No active sprint_
 None
 
 ## Recent Changes
+- 2026-01-21: Added `instructions` field to ShippingLocation schema
+- 2026-01-21: Created "AOS - Juarez US Plant" location (El Paso, TX) with "HEAT TREATED PALLETS" instruction
+- 2026-01-21: Updated packing slip generation to display shipping instructions in bold red
+- 2026-01-21: Updated documents API to pass instructions to packing slip
 - 2025-01-20: Updated part 100307705 `unitsPerBox` from 120 → 130
 - 2025-01-20: Updated part 100307705 `boxesPerPallet` from 68 → 51 (per Alecia's request - new 3-layer height requirement)
 - 2025-01-20: Added PUT endpoint to `/api/parts` for admin part updates
@@ -17,7 +21,8 @@ None
 - 2025-01-20: Bootstrapped .claude/ folder with ARCHITECTURE.md and STATUS.md
 
 ## Next Session
-- Consider adding part editing UI to admin panel
+- Deploy to Railway to make changes live
+- Test packing slip generation with Juarez location to verify instructions appear
 
 ## Deployment
 - **Platform**: Railway
