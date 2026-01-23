@@ -77,9 +77,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate total units - ALWAYS use 68 boxes per skid regardless of part settings
-    const BOXES_PER_SKID = 68
-    const totalBoxesReleased = requestedPallets * BOXES_PER_SKID + requestedBoxes
+    // Calculate total units using the part's configured boxes per pallet
+    const totalBoxesReleased = requestedPallets * part.boxesPerPallet + requestedBoxes
     const totalUnits = totalBoxesReleased * part.unitsPerBox
 
     // Generate release number (format: REL-YYYYMMDD-XXXX)
@@ -125,13 +124,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Update part inventory - ALWAYS use 68 boxes per skid
+    // Update part inventory using part's configured boxes per pallet
     let newPallets = part.currentPallets - requestedPallets
     let newBoxes = part.currentBoxes - requestedBoxes
 
     if (newBoxes < 0) {
       newPallets -= 1
-      newBoxes += BOXES_PER_SKID
+      newBoxes += part.boxesPerPallet
     }
 
     await prisma.part.update({
@@ -178,12 +177,12 @@ export async function POST(request: NextRequest) {
       shipVia: release.shipVia || 'Averitt Collect',
       freightTerms: release.freightTerms || 'Prepaid',
       paymentTerms: release.paymentTerms || '2% 30, Net 60',
-      cartons: release.cartons || (release.pallets * BOXES_PER_SKID + release.boxes),
+      cartons: release.cartons || (release.pallets * release.part.boxesPerPallet + release.boxes),
       weight: release.weight || 0,
       shippingClass: release.shippingClass || '55',
     }
 
-    const totalBoxes = release.pallets * BOXES_PER_SKID + release.boxes
+    const totalBoxes = release.pallets * release.part.boxesPerPallet + release.boxes
     const boxLabelData = {
       partNumber: release.part.partNumber,
       description: release.part.description,
