@@ -274,7 +274,7 @@ export default function HistoryPage() {
   const uniqueParts = Array.from(new Set(releases.map((r) => r.part.partNumber)))
   const uniqueLocations = Array.from(new Set(releases.map((r) => r.shippingLocation.name)))
 
-  const BOXES_PER_SKID = 68
+  // Using dynamic boxesPerPallet from each part instead of hardcoded value
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -536,7 +536,7 @@ export default function HistoryPage() {
                 <p className="text-lg font-bold text-blue-600">#{selectedRelease.part.partNumber}</p>
                 <p className="text-sm text-gray-600">{selectedRelease.part.description}</p>
                 <div className="mt-2 text-sm text-gray-500">
-                  {selectedRelease.part.unitsPerBox} units/box • {BOXES_PER_SKID} boxes/skid
+                  {selectedRelease.part.unitsPerBox} units/box • {selectedRelease.part.boxesPerPallet} boxes/skid
                 </div>
               </div>
 
@@ -665,7 +665,7 @@ export default function HistoryPage() {
                       <Tag className="w-5 h-5 text-green-600" />
                     )}
                     <span className="font-medium">
-                      Box Labels ({selectedRelease.pallets * BOXES_PER_SKID + selectedRelease.boxes} labels)
+                      Box Labels ({selectedRelease.pallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes} labels)
                     </span>
                     <Download className="w-4 h-4 ml-auto text-gray-400" />
                   </button>

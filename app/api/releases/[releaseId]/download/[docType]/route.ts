@@ -5,7 +5,7 @@ import { generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
 import { generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
 import { generateInvoiceBuffer } from '@/lib/documents/invoice'
 
-const BOXES_PER_SKID = 68
+// Using dynamic release.part.boxesPerPallet instead of hardcoded value
 
 /**
  * GET endpoint to download PDFs directly (no filesystem storage needed)
@@ -104,7 +104,7 @@ export async function GET(
         shipVia: release.shipVia || 'Averitt Collect',
         freightTerms: release.freightTerms || 'Prepaid',
         paymentTerms: release.paymentTerms || '2% 30, Net 60',
-        cartons: release.cartons || (release.pallets * BOXES_PER_SKID + release.boxes),
+        cartons: release.cartons || (release.pallets * release.part.boxesPerPallet + release.boxes),
         weight: release.weight || 0,
         shippingClass: release.shippingClass || '55',
       }
@@ -113,7 +113,7 @@ export async function GET(
       filename = `packing-slip-${release.releaseNumber}.pdf`
 
     } else if (docType === 'box-labels') {
-      const totalBoxes = release.pallets * BOXES_PER_SKID + release.boxes
+      const totalBoxes = release.pallets * release.part.boxesPerPallet + release.boxes
 
       const boxLabelData = {
         partNumber: release.part.partNumber,
