@@ -24,6 +24,7 @@ export interface ReleaseEmailData {
   customerPONumber: string
   shippingLocation: string
   invoiceTotal: string
+  notes?: string  // Special instructions (e.g., "Ship Estes Collect, heat-treated pallet")
 }
 
 /**
@@ -166,6 +167,17 @@ export async function sendReleaseNotification(
                               <div style="font-size: 16px; color: #111827; font-weight: 700;">${emailData.totalUnits.toLocaleString()}</div>
                             </td>
                           </tr>
+                          ${emailData.notes ? `
+                          <!-- Special Instructions Row -->
+                          <tr>
+                            <td colspan="2" style="padding: 12px 0 0 0;">
+                              <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; padding: 12px;">
+                                <div style="font-size: 11px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">⚠️ Special Instructions</div>
+                                <div style="font-size: 14px; color: #78350f; font-weight: 600;">${emailData.notes}</div>
+                              </div>
+                            </td>
+                          </tr>
+                          ` : ''}
                         </table>
 
                       </td>
@@ -242,7 +254,10 @@ Total Units: ${emailData.totalUnits.toLocaleString()}
 
 SHIPPING INFORMATION
 Ship To: ${emailData.shippingLocation}
-
+${emailData.notes ? `
+*** SPECIAL INSTRUCTIONS ***
+${emailData.notes}
+` : ''}
 Invoice Total: ${emailData.invoiceTotal}
 
 Attached Documents: ${attachments.map(att => att.filename).join(', ')}

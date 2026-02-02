@@ -72,6 +72,14 @@ export default function AdminPage() {
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Edit part modal
+  const [editingPart, setEditingPart] = useState<Part | null>(null)
+  const [editBoxesPerPallet, setEditBoxesPerPallet] = useState(0)
+  const [editUnitsPerBox, setEditUnitsPerBox] = useState(0)
+  const [editPricePerUnit, setEditPricePerUnit] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false)
+
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || user?.role !== 'ADMIN')) {
       router.push('/dashboard')
@@ -111,6 +119,56 @@ export default function AdminPage() {
       setError('Failed to load data')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const openEditModal = (part: Part) => {
+    setEditingPart(part)
+    setEditBoxesPerPallet(part.boxesPerPallet)
+    setEditUnitsPerBox(part.unitsPerBox)
+    setEditPricePerUnit(part.pricePerUnit)
+    setEditDescription(part.description)
+  }
+
+  const closeEditModal = () => {
+    setEditingPart(null)
+  }
+
+  const handleSavePart = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingPart) return
+
+    setIsEditSubmitting(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/parts', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          partId: editingPart.id,
+          boxesPerPallet: editBoxesPerPallet,
+          unitsPerBox: editUnitsPerBox,
+          pricePerUnit: parseFloat(editPricePerUnit),
+          description: editDescription,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update part')
+      }
+
+      // Close modal and refresh data
+      closeEditModal()
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update part')
+    } finally {
+      setIsEditSubmitting(false)
     }
   }
 
@@ -489,6 +547,98 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* Edit Part Modal */}
+        {editingPart && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Edit Part #{editingPart.partNumber}
+                </h3>
+                <button
+                  onClick={closeEditModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <form onSubmit={handleSavePart} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Boxes per Pallet
+                    </label>
+                    <input
+                      type="number"
+                      value={editBoxesPerPallet}
+                      onChange={(e) => setEditBoxesPerPallet(parseInt(e.target.value) || 0)}
+                      min={1}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Units per Box
+                    </label>
+                    <input
+                      type="number"
+                      value={editUnitsPerBox}
+                      onChange={(e) => setEditUnitsPerBox(parseInt(e.target.value) || 0)}
+                      min={1}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price per Unit ($)
+                  </label>
+                  <input
+                    type="text"
+                    value={editPricePerUnit}
+                    onChange={(e) => setEditPricePerUnit(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0.0000"
+                  />
+                </div>
+                <div className="bg-blue-50 p-3 rounded-lg text-sm">
+                  <p className="font-medium text-blue-900 mb-1">Units per Pallet Calculation:</p>
+                  <p className="text-blue-700">
+                    {editBoxesPerPallet} boxes × {editUnitsPerBox} units = {(editBoxesPerPallet * editUnitsPerBox).toLocaleString()} units/pallet
+                  </p>
+                </div>
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isEditSubmitting}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isEditSubmitting ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Current Inventory Tab */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
@@ -500,9 +650,17 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {parts.map((part) => (
                     <div key={part.id} className="border-2 border-gray-200 rounded-lg p-6">
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        Part #{part.partNumber}
-                      </h3>
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          Part #{part.partNumber}
+                        </h3>
+                        <button
+                          onClick={() => openEditModal(part)}
+                          className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Edit
+                        </button>
+                      </div>
                       <p className="text-sm text-gray-600 mb-4">{part.description}</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-50 p-4 rounded">
@@ -515,6 +673,14 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="mt-4 pt-4 border-t border-gray-200 space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Boxes per Pallet:</span>
+                          <span className="font-semibold">{part.boxesPerPallet}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Units per Box:</span>
+                          <span className="font-semibold">{part.unitsPerBox}</span>
+                        </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Total Boxes:</span>
                           <span className="font-semibold">

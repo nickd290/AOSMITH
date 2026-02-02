@@ -143,6 +143,12 @@ export async function POST(request: NextRequest) {
 
     // === AUTO-GENERATE ALL DOCUMENTS ===
     // Build data objects first (no I/O)
+    // Combine shipping location instructions with release notes for packing slip
+    const shippingInstructions = [
+      release.shippingLocation.instructions,
+      release.notes
+    ].filter(Boolean).join(' | ') || undefined
+
     const packingSlipData = {
       releaseNumber: release.releaseNumber,
       ticketNumber: release.ticketNumber || 'N/A',
@@ -154,6 +160,7 @@ export async function POST(request: NextRequest) {
         city: release.shippingLocation.city,
         state: release.shippingLocation.state,
         zip: release.shippingLocation.zip,
+        instructions: shippingInstructions,
       },
       shipFrom: {
         name: 'Enterprise Print Group',
@@ -270,6 +277,7 @@ export async function POST(request: NextRequest) {
           customerPONumber: release.customerPONumber,
           shippingLocation: release.shippingLocation.name,
           invoiceTotal: `$${orderTotal.toFixed(2)}`,
+          notes: release.notes || undefined,
         },
         [
           {
