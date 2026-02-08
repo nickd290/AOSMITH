@@ -6,6 +6,7 @@ import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labe
 import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknowledgement'
 import { sendReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
+import { createThreezPortalJob, isThreezPortalConfigured } from '@/lib/integrations/threez-portal'
 
 export async function POST(request: NextRequest) {
   try {
@@ -364,6 +365,30 @@ export async function POST(request: NextRequest) {
         console.error('⚠️ Error creating Impact job:', impactError)
         // Don't fail the release if impactd122 fails
       }
+    }
+
+    // 5. Create job in Three Z Job Portal
+    if (isThreezPortalConfigured()) {
+      const releaseDetails = [
+        `Release #: ${release.releaseNumber}`,
+        `Part: ${release.part.partNumber} — ${release.part.description}`,
+        `Customer PO#: ${release.customerPONumber}`,
+        `Quantity: ${release.totalUnits.toLocaleString()} units (${release.pallets} pallets, ${release.boxes} boxes)`,
+        `Ship To: ${release.shippingLocation.name}`,
+        `Ship Via: ${release.shipVia || 'Averitt Collect'}`,
+        release.shipDate ? `Ship Date: ${new Date(release.shipDate).toLocaleDateString('en-US')}` : null,
+        release.notes ? `Notes: ${release.notes}` : null,
+        '',
+        'Source: Inventory Release App',
+      ].filter(Boolean).join('\n')
+
+      createThreezPortalJob({
+        title: `EPG Release — ${release.part.partNumber} — ${release.totalUnits.toLocaleString()} units`,
+        customerName: 'EPrint Group',
+        emailBody: releaseDetails,
+      }).catch((err) =>
+        console.error('[threez-portal] Failed for release:', release.releaseNumber, err)
+      )
     }
 
     return NextResponse.json({ release })
