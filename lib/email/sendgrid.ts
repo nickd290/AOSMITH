@@ -301,6 +301,226 @@ Enterprise Print Group - Automated Release Notification
  * To: ap@eprintgroup.com
  * CC: nick@jdgraphic.com, brandon@impactdirectprinting.com
  */
+/**
+ * Send "Ready to Ship" notification when customer uploads their packing slip
+ */
+export async function sendPackingSlipReadyNotification(
+  emailData: {
+    releaseNumber: string
+    customerPONumber: string
+    partNumber: string
+    partDescription: string
+    totalUnits: number
+    pallets: number
+    boxes: number
+    shippingLocation: string
+    shipDate?: string | null
+  },
+  attachment: EmailAttachment
+): Promise<void> {
+  const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailTo = process.env.EMAIL_TO || 'nick@jdgraphic.com'
+  const emailCc = process.env.EMAIL_CC || ''
+
+  const sgAttachment = {
+    content: attachment.content || '',
+    filename: attachment.filename,
+    type: attachment.type || 'application/pdf',
+    disposition: 'attachment' as const,
+  }
+
+  const shipDateStr = emailData.shipDate
+    ? new Date(emailData.shipDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Not set'
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+          <td align="center" style="padding: 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #b45309 0%, #92400e 100%); padding: 20px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">
+                          Ready to Ship
+                        </div>
+                      </td>
+                      <td align="right" style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 16px; font-weight: 700;">
+                          ${emailData.releaseNumber}
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Message Banner -->
+              <tr>
+                <td style="padding: 24px; background-color: #fffbeb; border-bottom: 2px solid #f59e0b;">
+                  <div style="font-size: 15px; color: #92400e; font-weight: 600; line-height: 1.5;">
+                    EPrint Group has uploaded their packing slip &mdash; this release is ready to ship.
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Main Content Card -->
+              <tr>
+                <td style="padding: 24px; background-color: #ffffff;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #b45309; border-radius: 4px;">
+                    <tr>
+                      <td style="padding: 16px 20px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Release Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.releaseNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Customer PO #</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.customerPONumber}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Part Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.partNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Description</div>
+                              <div style="font-size: 13px; color: #374151;">${emailData.partDescription}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Quantity</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship Date</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${shipDateStr}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td colspan="2" style="padding: 12px 0 0 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship To</div>
+                              <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.shippingLocation}</div>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Attachment -->
+              <tr>
+                <td style="padding: 0 24px 24px 24px;">
+                  <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Attached Customer Packing Slip</div>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="padding: 4px 0;">
+                        <span style="display: inline-block; background-color: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500;">
+                          ${attachment.filename}
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
+                  <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
+                    Enterprise Print Group &ndash; Customer Packing Slip Upload Notification
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  const textBody = `
+READY TO SHIP - ${emailData.releaseNumber}
+
+EPrint Group has uploaded their packing slip - this release is ready to ship.
+
+RELEASE DETAILS
+Release Number: ${emailData.releaseNumber}
+Customer PO #: ${emailData.customerPONumber}
+
+PRODUCT INFORMATION
+Part Number: ${emailData.partNumber}
+Description: ${emailData.partDescription}
+Quantity: ${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)
+
+SHIPPING INFORMATION
+Ship To: ${emailData.shippingLocation}
+Ship Date: ${shipDateStr}
+
+Attached: ${attachment.filename}
+
+---
+Enterprise Print Group - Customer Packing Slip Upload Notification
+  `
+
+  const msg = {
+    to: emailTo,
+    cc: emailCc.split(',').map(email => email.trim()).filter(email => email),
+    from: {
+      email: emailFrom,
+      name: emailFromName,
+    },
+    subject: `Ready to Ship - ${emailData.releaseNumber} - ${emailData.partNumber}`,
+    text: textBody,
+    html: htmlBody,
+    attachments: [sgAttachment],
+  }
+
+  try {
+    if (!apiKey) {
+      console.log('SendGrid API key not configured. Ready to Ship email would have been sent to:', emailTo)
+      console.log('Subject:', msg.subject)
+      console.log('Attachment:', attachment.filename)
+      return
+    }
+
+    await sgMail.send(msg)
+    const ccList = emailCc ? `, CC: ${emailCc}` : ''
+    console.log(`Ready to Ship email sent successfully to: ${emailTo}${ccList}`)
+  } catch (error) {
+    console.error('Error sending Ready to Ship email:', error)
+    throw error
+  }
+}
+
+/**
+ * Send invoice email on ship date
+ * To: ap@eprintgroup.com
+ * CC: nick@jdgraphic.com, brandon@impactdirectprinting.com
+ */
 export async function sendInvoiceEmail(
   emailData: ReleaseEmailData & { shipDate: Date; etaDeliveryDate?: Date | null },
   invoiceAttachment: EmailAttachment

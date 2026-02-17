@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2 } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, Upload } from 'lucide-react'
 
 interface Release {
   id: string
@@ -26,6 +26,9 @@ interface Release {
   boxLabelsUrl?: string | null
   invoiceUrl?: string | null
   documentsGenerated?: string | null
+  customerPackingSlipUrl?: string | null
+  customerPackingSlipName?: string | null
+  customerPackingSlipUploadedAt?: string | null
   part: {
     partNumber: string
     description: string
@@ -71,6 +74,10 @@ export default function HistoryPage() {
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Customer packing slip upload state
+  const [isUploadingSlip, setIsUploadingSlip] = useState(false)
+  const [slipFile, setSlipFile] = useState<File | null>(null)
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/')
@@ -92,6 +99,7 @@ export default function HistoryPage() {
     if (selectedRelease) {
       setTrackingNumber(selectedRelease.trackingNumber || '')
       setShipDate(selectedRelease.shipDate ? selectedRelease.shipDate.split('T')[0] : '')
+      setSlipFile(null)
     }
   }, [selectedRelease])
 
@@ -263,6 +271,42 @@ export default function HistoryPage() {
     }
   }
 
+  const uploadCustomerPackingSlip = async () => {
+    if (!selectedRelease || !slipFile) return
+
+    setIsUploadingSlip(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', slipFile)
+
+      const response = await fetch(`/api/releases/${selectedRelease.id}/upload-packing-slip`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to upload packing slip')
+      }
+
+      const data = await response.json()
+
+      // Update the release in the list
+      setReleases(releases.map(r => r.id === data.release.id ? data.release : r))
+      setSelectedRelease(data.release)
+      setSlipFile(null)
+
+      alert('Packing slip uploaded successfully! A "Ready to Ship" email has been sent.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to upload packing slip')
+    } finally {
+      setIsUploadingSlip(false)
+    }
+  }
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -400,6 +444,9 @@ export default function HistoryPage() {
                         Location
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ship Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -439,6 +486,11 @@ export default function HistoryPage() {
                           <div className="text-xs text-gray-500">
                             {release.shippingLocation.city}, {release.shippingLocation.state}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {release.shipDate
+                            ? new Date(release.shipDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                            : <span className="text-gray-400">-</span>}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <span
@@ -635,6 +687,76 @@ export default function HistoryPage() {
                     {isUpdating ? 'Updating...' : 'Update Shipping Info'}
                   </button>
                 </div>
+              </div>
+
+              {/* Customer Packing Slip Upload */}
+              <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Upload className="w-5 h-5" />
+                  Customer Packing Slip
+                </h3>
+                {selectedRelease.customerPackingSlipUrl ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-white border border-amber-200 rounded-lg">
+                      <FileText className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {selectedRelease.customerPackingSlipName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Uploaded {selectedRelease.customerPackingSlipUploadedAt
+                            ? new Date(selectedRelease.customerPackingSlipUploadedAt).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                              })
+                            : ''}
+                        </p>
+                      </div>
+                      <a
+                        href={selectedRelease.customerPackingSlipUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-amber-100 rounded-lg"
+                        title="View/Download"
+                      >
+                        <Download className="w-4 h-4 text-amber-600" />
+                      </a>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Re-upload packing slip</label>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
+                        className="w-full text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
+                      />
+                      {slipFile && (
+                        <button
+                          onClick={uploadCustomerPackingSlip}
+                          disabled={isUploadingSlip}
+                          className="mt-2 w-full px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isUploadingSlip ? 'Uploading...' : 'Re-upload Packing Slip'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
+                      className="w-full text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
+                    />
+                    <button
+                      onClick={uploadCustomerPackingSlip}
+                      disabled={isUploadingSlip || !slipFile}
+                      className="w-full px-4 py-2 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUploadingSlip ? 'Uploading...' : 'Upload Packing Slip'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Documents */}

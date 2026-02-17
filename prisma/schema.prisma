@@ -107,6 +107,11 @@ model Release {
   shipDate            DateTime?        // Scheduled ship date (pickup date)
   etaDeliveryDate     DateTime?        // Estimated delivery date (5 business days from ship date)
 
+  // Customer-uploaded packing slip (EPG branded)
+  customerPackingSlipUrl        String?    // R2 URL for the uploaded EPG packing slip
+  customerPackingSlipName       String?    // Original filename (e.g., "PS 18256.pdf")
+  customerPackingSlipUploadedAt DateTime?  // When it was uploaded
+
   // Invoice tracking
   invoiceSent         Boolean          @default(false)  // Whether invoice has been sent
   invoiceSentAt       DateTime?        // When invoice was sent
