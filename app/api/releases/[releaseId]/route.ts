@@ -25,6 +25,9 @@ export async function GET(
 
     const release = await prisma.release.findUnique({
       where: { id: releaseId },
+      omit: {
+        customerPackingSlipData: true,
+      },
       include: {
         part: true,
         shippingLocation: true,

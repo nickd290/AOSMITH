@@ -102,7 +102,9 @@ export async function POST(
       console.error('Failed to send Ready to Ship email:', emailError)
     }
 
-    return NextResponse.json({ release: updatedRelease })
+    // Strip binary data from response
+    const { customerPackingSlipData, ...releaseWithoutData } = updatedRelease
+    return NextResponse.json({ release: releaseWithoutData })
   } catch (error) {
     console.error('Error uploading customer packing slip:', error)
     return NextResponse.json({ error: 'An error occurred' }, { status: 500 })

@@ -428,6 +428,9 @@ export async function GET(request: NextRequest) {
 
     const releases = await prisma.release.findMany({
       where: whereClause,
+      omit: {
+        customerPackingSlipData: true,
+      },
       include: {
         part: true,
         shippingLocation: true,
