@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
-import { sendPackingSlipReadyNotification } from '@/lib/email/sendgrid'
+import { sendPackingSlipReadyNotification, sendThreeZShipNotification } from '@/lib/email/sendgrid'
 
 export async function POST(
   request: NextRequest,
@@ -100,6 +100,30 @@ export async function POST(
     } catch (emailError) {
       // Log but don't fail the upload if email fails
       console.error('Failed to send Ready to Ship email:', emailError)
+    }
+
+    // Email 2B: Three Z ship authorization (customer's packing slip attached)
+    try {
+      await sendThreeZShipNotification(
+        {
+          releaseNumber: release.releaseNumber,
+          customerPONumber: release.customerPONumber,
+          partNumber: release.part.partNumber,
+          partDescription: release.part.description,
+          totalUnits: release.totalUnits,
+          pallets: release.pallets,
+          boxes: release.boxes,
+          shippingLocation: `${loc.name} - ${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`,
+          shipDate: release.shipDate?.toISOString() ?? null,
+        },
+        {
+          filename: file.name,
+          content: buffer.toString('base64'),
+          type: 'application/pdf',
+        }
+      )
+    } catch (threeZError) {
+      console.error('Failed to send Three Z ship email:', threeZError)
     }
 
     // Strip binary data from response

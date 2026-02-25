@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { generateInvoiceBuffer } from '@/lib/documents/invoice'
-import { sendInvoiceEmail } from '@/lib/email/sendgrid'
+import { sendInvoiceReminderEmail } from '@/lib/email/sendgrid'
 
 /**
  * Cron endpoint to send invoices for releases with ship date = today
@@ -60,63 +59,20 @@ export async function GET(request: NextRequest) {
       try {
         const invoiceTotal = release.totalUnits * release.part.pricePerUnit
 
-        // Generate invoice data
-        const invoiceData = {
-          invoiceNumber: release.releaseNumber,
-          date: release.createdAt,
+        // Send internal invoice reminder email (to John, Brenda, Crista)
+        await sendInvoiceReminderEmail({
+          releaseNumber: release.releaseNumber,
+          partNumber: release.part.partNumber,
+          partDescription: release.part.description,
+          pallets: release.pallets,
+          boxes: release.boxes,
+          totalUnits: release.totalUnits,
           customerPONumber: release.customerPONumber,
-          billTo: {
-            name: 'Enterprise Print Group',
-            address: 'P.O. Box 52870',
-            city: 'Knoxville',
-            state: 'TN',
-            zip: '37950',
-          },
-          billFrom: {
-            name: 'Impact Direct',
-            address: '1550 N Northwest Highway',
-            city: 'Park Ridge',
-            state: 'IL',
-            zip: '60068',
-          },
-          lineItems: [
-            {
-              partNumber: release.part.partNumber,
-              description: release.part.description,
-              quantity: release.totalUnits,
-              unitPrice: release.part.pricePerUnit,
-              total: invoiceTotal,
-            },
-          ],
-          subtotal: invoiceTotal,
-          tax: 0,
-          total: invoiceTotal,
-          paymentTerms: release.paymentTerms || '2% 30, Net 60',
-        }
-
-        // Generate invoice PDF
-        const invoiceBuffer = generateInvoiceBuffer(invoiceData)
-
-        // Send invoice email
-        await sendInvoiceEmail(
-          {
-            releaseNumber: release.releaseNumber,
-            partNumber: release.part.partNumber,
-            partDescription: release.part.description,
-            pallets: release.pallets,
-            boxes: release.boxes,
-            totalUnits: release.totalUnits,
-            customerPONumber: release.customerPONumber,
-            shippingLocation: release.shippingLocation.name,
-            invoiceTotal: `$${invoiceTotal.toFixed(2)}`,
-            shipDate: release.shipDate || new Date(),
-            etaDeliveryDate: release.etaDeliveryDate,
-          },
-          {
-            filename: `invoice-${release.releaseNumber}.pdf`,
-            content: invoiceBuffer.toString('base64'),
-          }
-        )
+          shippingLocation: release.shippingLocation.name,
+          invoiceTotal: `$${invoiceTotal.toFixed(2)}`,
+          shipDate: release.shipDate || new Date(),
+          etaDeliveryDate: release.etaDeliveryDate,
+        })
 
         // Mark invoice as sent
         await prisma.release.update({
@@ -201,63 +157,20 @@ export async function POST(request: NextRequest) {
 
     const invoiceTotal = release.totalUnits * release.part.pricePerUnit
 
-    // Generate invoice data
-    const invoiceData = {
-      invoiceNumber: release.releaseNumber,
-      date: release.createdAt,
+    // Send internal invoice reminder email (to John, Brenda, Crista)
+    await sendInvoiceReminderEmail({
+      releaseNumber: release.releaseNumber,
+      partNumber: release.part.partNumber,
+      partDescription: release.part.description,
+      pallets: release.pallets,
+      boxes: release.boxes,
+      totalUnits: release.totalUnits,
       customerPONumber: release.customerPONumber,
-      billTo: {
-        name: 'Enterprise Print Group',
-        address: 'P.O. Box 52870',
-        city: 'Knoxville',
-        state: 'TN',
-        zip: '37950',
-      },
-      billFrom: {
-        name: 'Impact Direct',
-        address: '1550 N Northwest Highway',
-        city: 'Park Ridge',
-        state: 'IL',
-        zip: '60068',
-      },
-      lineItems: [
-        {
-          partNumber: release.part.partNumber,
-          description: release.part.description,
-          quantity: release.totalUnits,
-          unitPrice: release.part.pricePerUnit,
-          total: invoiceTotal,
-        },
-      ],
-      subtotal: invoiceTotal,
-      tax: 0,
-      total: invoiceTotal,
-      paymentTerms: release.paymentTerms || '2% 30, Net 60',
-    }
-
-    // Generate invoice PDF
-    const invoiceBuffer = generateInvoiceBuffer(invoiceData)
-
-    // Send invoice email
-    await sendInvoiceEmail(
-      {
-        releaseNumber: release.releaseNumber,
-        partNumber: release.part.partNumber,
-        partDescription: release.part.description,
-        pallets: release.pallets,
-        boxes: release.boxes,
-        totalUnits: release.totalUnits,
-        customerPONumber: release.customerPONumber,
-        shippingLocation: release.shippingLocation.name,
-        invoiceTotal: `$${invoiceTotal.toFixed(2)}`,
-        shipDate: release.shipDate || new Date(),
-        etaDeliveryDate: release.etaDeliveryDate,
-      },
-      {
-        filename: `invoice-${release.releaseNumber}.pdf`,
-        content: invoiceBuffer.toString('base64'),
-      }
-    )
+      shippingLocation: release.shippingLocation.name,
+      invoiceTotal: `$${invoiceTotal.toFixed(2)}`,
+      shipDate: release.shipDate || new Date(),
+      etaDeliveryDate: release.etaDeliveryDate,
+    })
 
     // Mark invoice as sent
     await prisma.release.update({

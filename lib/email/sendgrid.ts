@@ -297,10 +297,446 @@ Enterprise Print Group - Automated Release Notification
 }
 
 /**
- * Send invoice email on ship date
- * To: ap@eprintgroup.com
- * CC: nick@jdgraphic.com, brandon@impactdirectprinting.com
+ * Send Three Z release notification (Email 1B)
+ * To: Jenny Koester + Derek Meinhart at Three Z
+ * Triggered: When a release is created (same time as Email 1 to ePrint)
+ * Attachment: Box labels only
+ * Key message: Ship date prominent, don't book truck until packing slip uploaded
  */
+export async function sendThreeZReleaseNotification(
+  emailData: ReleaseEmailData & { shipDate?: string | null },
+  boxLabelsAttachment: EmailAttachment
+): Promise<void> {
+  const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+
+  const threeZTo = ['jkoester@threez.com', 'dmeinhart@threez.com']
+
+  const sgAttachment = {
+    content: boxLabelsAttachment.content || '',
+    filename: boxLabelsAttachment.filename,
+    type: boxLabelsAttachment.type || 'application/pdf',
+    disposition: 'attachment' as const,
+  }
+
+  const shipDateStr = emailData.shipDate
+    ? new Date(emailData.shipDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Not set'
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+          <td align="center" style="padding: 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); padding: 20px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">
+                          Three Z &mdash; New Release
+                        </div>
+                      </td>
+                      <td align="right" style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 16px; font-weight: 700;">
+                          ${emailData.releaseNumber}
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Ship Date Banner (PROMINENT) -->
+              <tr>
+                <td style="padding: 24px; background-color: #faf5ff; border-bottom: 3px solid #7c3aed;">
+                  <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #6b21a8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Ship Date</div>
+                    <div style="font-size: 24px; color: #5b21b6; font-weight: 800;">${shipDateStr}</div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Warning Banner -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #fef3c7; border-bottom: 2px solid #f59e0b;">
+                  <div style="font-size: 14px; color: #92400e; font-weight: 700; text-align: center; line-height: 1.5;">
+                    ⚠️ DO NOT book truck until packing slip is uploaded to the portal.
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Main Content Card -->
+              <tr>
+                <td style="padding: 24px; background-color: #ffffff;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #7c3aed; border-radius: 4px;">
+                    <tr>
+                      <td style="padding: 16px 20px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Release Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.releaseNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Customer PO #</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.customerPONumber}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Part Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.partNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Description</div>
+                              <div style="font-size: 13px; color: #374151;">${emailData.partDescription}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Quantity</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship To</div>
+                              <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.shippingLocation}</div>
+                            </td>
+                          </tr>
+                          ${emailData.notes ? `
+                          <tr>
+                            <td colspan="2" style="padding: 12px 0 0 0;">
+                              <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; padding: 12px;">
+                                <div style="font-size: 11px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Special Instructions</div>
+                                <div style="font-size: 14px; color: #78350f; font-weight: 600;">${emailData.notes}</div>
+                              </div>
+                            </td>
+                          </tr>
+                          ` : ''}
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Attachment -->
+              <tr>
+                <td style="padding: 0 24px 24px 24px;">
+                  <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Attached Box Labels</div>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="padding: 4px 0;">
+                        <span style="display: inline-block; background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500;">
+                          📄 ${boxLabelsAttachment.filename}
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
+                  <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
+                    JD Graphic / Impact Direct &ndash; Three Z Release Notification
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  const textBody = `
+THREE Z — NEW RELEASE - ${emailData.releaseNumber}
+
+*** SHIP DATE: ${shipDateStr} ***
+
+⚠️ DO NOT book truck until packing slip is uploaded to the portal.
+
+RELEASE DETAILS
+Release Number: ${emailData.releaseNumber}
+Customer PO #: ${emailData.customerPONumber}
+
+PRODUCT INFORMATION
+Part Number: ${emailData.partNumber}
+Description: ${emailData.partDescription}
+Quantity: ${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)
+
+Ship To: ${emailData.shippingLocation}
+${emailData.notes ? `\nSpecial Instructions: ${emailData.notes}` : ''}
+
+Attached: ${boxLabelsAttachment.filename} (Box Labels)
+
+---
+JD Graphic / Impact Direct - Three Z Release Notification
+  `
+
+  const msg = {
+    to: threeZTo,
+    from: {
+      email: emailFrom,
+      name: emailFromName,
+    },
+    subject: `New Release - ${emailData.releaseNumber} — Ship Date: ${shipDateStr}`,
+    text: textBody,
+    html: htmlBody,
+    attachments: [sgAttachment],
+  }
+
+  try {
+    if (!apiKey) {
+      console.log('⚠️ SendGrid API key not configured. Three Z release email would have been sent to:', threeZTo.join(', '))
+      console.log('📧 Subject:', msg.subject)
+      return
+    }
+
+    await sgMail.send(msg)
+    console.log(`✅ Three Z release email sent to: ${threeZTo.join(', ')}`)
+  } catch (error) {
+    console.error('❌ Error sending Three Z release email:', error)
+    throw error
+  }
+}
+
+/**
+ * Send Three Z ship notification (Email 2B)
+ * To: Jenny Koester + Derek Meinhart at Three Z
+ * Triggered: When customer uploads their packing slip
+ * Attachment: Customer's packing slip
+ * Key message: OK to release and ship, use the attached packing slip
+ */
+export async function sendThreeZShipNotification(
+  emailData: {
+    releaseNumber: string
+    customerPONumber: string
+    partNumber: string
+    partDescription: string
+    totalUnits: number
+    pallets: number
+    boxes: number
+    shippingLocation: string
+    shipDate?: string | null
+  },
+  packingSlipAttachment: EmailAttachment
+): Promise<void> {
+  const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+
+  const threeZTo = ['jkoester@threez.com', 'dmeinhart@threez.com']
+
+  const sgAttachment = {
+    content: packingSlipAttachment.content || '',
+    filename: packingSlipAttachment.filename,
+    type: packingSlipAttachment.type || 'application/pdf',
+    disposition: 'attachment' as const,
+  }
+
+  const shipDateStr = emailData.shipDate
+    ? new Date(emailData.shipDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Not set'
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+          <td align="center" style="padding: 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 20px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">
+                          Three Z &mdash; OK to Ship
+                        </div>
+                      </td>
+                      <td align="right" style="vertical-align: middle;">
+                        <div style="color: #ffffff; font-size: 16px; font-weight: 700;">
+                          ${emailData.releaseNumber}
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- GO Banner -->
+              <tr>
+                <td style="padding: 24px; background-color: #ecfdf5; border-bottom: 3px solid #059669;">
+                  <div style="font-size: 16px; color: #065f46; font-weight: 700; text-align: center; line-height: 1.5;">
+                    ✅ Packing slip uploaded &mdash; OK to release and ship.<br>
+                    <span style="font-size: 13px; font-weight: 600;">Use the attached packing slip from the customer.</span>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Ship Date -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #f0fdf4;">
+                  <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Ship Date</div>
+                    <div style="font-size: 20px; color: #14532d; font-weight: 800;">${shipDateStr}</div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Main Content Card -->
+              <tr>
+                <td style="padding: 24px; background-color: #ffffff;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #059669; border-radius: 4px;">
+                    <tr>
+                      <td style="padding: 16px 20px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Release Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.releaseNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Customer PO #</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.customerPONumber}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Part Number</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.partNumber}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Description</div>
+                              <div style="font-size: 13px; color: #374151;">${emailData.partDescription}</div>
+                            </td>
+                          </tr>
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
+                          <tr>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Quantity</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship To</div>
+                              <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.shippingLocation}</div>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Attachment -->
+              <tr>
+                <td style="padding: 0 24px 24px 24px;">
+                  <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Attached Customer Packing Slip</div>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="padding: 4px 0;">
+                        <span style="display: inline-block; background-color: #ecfdf5; color: #065f46; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500;">
+                          📄 ${packingSlipAttachment.filename}
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
+                  <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
+                    JD Graphic / Impact Direct &ndash; Three Z Ship Authorization
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  const textBody = `
+THREE Z — OK TO SHIP - ${emailData.releaseNumber}
+
+✅ Packing slip uploaded — OK to release and ship.
+Use the attached packing slip from the customer.
+
+SHIP DATE: ${shipDateStr}
+
+RELEASE DETAILS
+Release Number: ${emailData.releaseNumber}
+Customer PO #: ${emailData.customerPONumber}
+
+PRODUCT INFORMATION
+Part Number: ${emailData.partNumber}
+Description: ${emailData.partDescription}
+Quantity: ${emailData.pallets} pallets, ${emailData.boxes} boxes (${emailData.totalUnits.toLocaleString()} units)
+
+Ship To: ${emailData.shippingLocation}
+
+Attached: ${packingSlipAttachment.filename} (Customer Packing Slip)
+
+---
+JD Graphic / Impact Direct - Three Z Ship Authorization
+  `
+
+  const msg = {
+    to: threeZTo,
+    from: {
+      email: emailFrom,
+      name: emailFromName,
+    },
+    subject: `OK to Ship - ${emailData.releaseNumber} — Packing Slip Uploaded`,
+    text: textBody,
+    html: htmlBody,
+    attachments: [sgAttachment],
+  }
+
+  try {
+    if (!apiKey) {
+      console.log('⚠️ SendGrid API key not configured. Three Z ship email would have been sent to:', threeZTo.join(', '))
+      console.log('📧 Subject:', msg.subject)
+      return
+    }
+
+    await sgMail.send(msg)
+    console.log(`✅ Three Z ship authorization email sent to: ${threeZTo.join(', ')}`)
+  } catch (error) {
+    console.error('❌ Error sending Three Z ship email:', error)
+    throw error
+  }
+}
+
 /**
  * Send "Ready to Ship" notification when customer uploads their packing slip
  */
@@ -517,28 +953,19 @@ Enterprise Print Group - Customer Packing Slip Upload Notification
 }
 
 /**
- * Send invoice email on ship date
- * To: ap@eprintgroup.com
- * CC: nick@jdgraphic.com, brandon@impactdirectprinting.com
+ * Send internal invoice reminder on ship date (Email 3)
+ * To: john@jdgraphic.com, brenda@jdgraphic.com, crista@jdgraphic.com
+ * Triggered: Cron on ship date (replaces old invoice email to ap@eprintgroup.com)
+ * No attachment — just a heads-up that this job needs to be invoiced
  */
-export async function sendInvoiceEmail(
-  emailData: ReleaseEmailData & { shipDate: Date; etaDeliveryDate?: Date | null },
-  invoiceAttachment: EmailAttachment
+export async function sendInvoiceReminderEmail(
+  emailData: ReleaseEmailData & { shipDate: Date; etaDeliveryDate?: Date | null }
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Invoice'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
 
-  // Fixed recipients for invoice
-  const emailTo = 'ap@eprintgroup.com'
-  const emailCc = ['nick@jdgraphic.com', 'brandon@impactdirectprinting.com']
-
-  // Prepare attachment for SendGrid
-  const sgAttachment = {
-    content: invoiceAttachment.content || '',
-    filename: invoiceAttachment.filename,
-    type: invoiceAttachment.type || 'application/pdf',
-    disposition: 'attachment' as const,
-  }
+  // Internal JD team recipients
+  const emailTo = ['john@jdgraphic.com', 'brenda@jdgraphic.com', 'crista@jdgraphic.com']
 
   const shipDateStr = emailData.shipDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -547,16 +974,6 @@ export async function sendInvoiceEmail(
     day: 'numeric',
   })
 
-  const etaStr = emailData.etaDeliveryDate
-    ? emailData.etaDeliveryDate.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : 'N/A'
-
-  // Create HTML email body for invoice
   const htmlBody = `
     <!DOCTYPE html>
     <html>
@@ -572,12 +989,12 @@ export async function sendInvoiceEmail(
 
               <!-- Header -->
               <tr>
-                <td style="background: linear-gradient(135deg, #166534 0%, #14532d 100%); padding: 20px 24px;">
+                <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 20px 24px;">
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                     <tr>
                       <td style="vertical-align: middle;">
                         <div style="color: #ffffff; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">
-                          💰 Invoice - Ship Date
+                          Invoice Needed
                         </div>
                       </td>
                       <td align="right" style="vertical-align: middle;">
@@ -590,34 +1007,22 @@ export async function sendInvoiceEmail(
                 </td>
               </tr>
 
-              <!-- Ship Date Banner -->
+              <!-- Action Banner -->
               <tr>
-                <td style="padding: 24px; background-color: #f0fdf4; border-bottom: 2px solid #22c55e;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                    <tr>
-                      <td width="50%">
-                        <div style="font-size: 11px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship Date</div>
-                        <div style="font-size: 16px; color: #14532d; font-weight: 700;">${shipDateStr}</div>
-                      </td>
-                      <td width="50%">
-                        <div style="font-size: 11px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">ETA Delivery</div>
-                        <div style="font-size: 16px; color: #14532d; font-weight: 700;">${etaStr}</div>
-                      </td>
-                    </tr>
-                  </table>
+                <td style="padding: 24px; background-color: #fef2f2; border-bottom: 2px solid #dc2626;">
+                  <div style="font-size: 16px; color: #991b1b; font-weight: 700; text-align: center; line-height: 1.5;">
+                    This job is shipping today and needs to be invoiced.
+                  </div>
                 </td>
               </tr>
 
               <!-- Main Content Card -->
               <tr>
                 <td style="padding: 24px; background-color: #ffffff;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #166534; border-radius: 4px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #dc2626; border-radius: 4px;">
                     <tr>
                       <td style="padding: 16px 20px;">
-
-                        <!-- Two Column Grid -->
                         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                          <!-- Row 1 -->
                           <tr>
                             <td width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
                               <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Release Number</div>
@@ -628,15 +1033,7 @@ export async function sendInvoiceEmail(
                               <div style="font-size: 14px; color: #111827; font-weight: 600;">${emailData.customerPONumber}</div>
                             </td>
                           </tr>
-
-                          <!-- Separator -->
-                          <tr>
-                            <td colspan="2" style="padding: 8px 0;">
-                              <div style="height: 1px; background-color: #e5e7eb;"></div>
-                            </td>
-                          </tr>
-
-                          <!-- Row 2 -->
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
                           <tr>
                             <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
                               <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Part Number</div>
@@ -647,57 +1044,29 @@ export async function sendInvoiceEmail(
                               <div style="font-size: 13px; color: #374151;">${emailData.partDescription}</div>
                             </td>
                           </tr>
-
-                          <!-- Separator -->
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
                           <tr>
-                            <td colspan="2" style="padding: 8px 0;">
-                              <div style="height: 1px; background-color: #e5e7eb;"></div>
+                            <td width="50%" style="padding: 12px 8px 12px 0; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship Date</div>
+                              <div style="font-size: 14px; color: #111827; font-weight: 700;">${shipDateStr}</div>
+                            </td>
+                            <td width="50%" style="padding: 12px 0 12px 8px; vertical-align: top;">
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Units</div>
+                              <div style="font-size: 16px; color: #111827; font-weight: 700;">${emailData.totalUnits.toLocaleString()}</div>
                             </td>
                           </tr>
-
-                          <!-- Row 3 -->
+                          <tr><td colspan="2" style="padding: 8px 0;"><div style="height: 1px; background-color: #e5e7eb;"></div></td></tr>
                           <tr>
                             <td width="50%" style="padding: 12px 8px 0 0; vertical-align: top;">
                               <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Ship To</div>
                               <div style="font-size: 13px; color: #374151; line-height: 1.4;">${emailData.shippingLocation}</div>
                             </td>
                             <td width="50%" style="padding: 12px 0 0 8px; vertical-align: top;">
-                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Units</div>
-                              <div style="font-size: 16px; color: #111827; font-weight: 700;">${emailData.totalUnits.toLocaleString()}</div>
+                              <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Invoice Amount</div>
+                              <div style="font-size: 20px; color: #dc2626; font-weight: 700;">${emailData.invoiceTotal}</div>
                             </td>
                           </tr>
                         </table>
-
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-
-              <!-- Invoice Total Highlight -->
-              <tr>
-                <td style="padding: 0 24px 24px 24px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #166534 0%, #14532d 100%); border-radius: 6px;">
-                    <tr>
-                      <td style="padding: 18px 24px; text-align: center;">
-                        <div style="color: #bbf7d0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Invoice Total Due</div>
-                        <div style="color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">${emailData.invoiceTotal}</div>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-
-              <!-- Attachments -->
-              <tr>
-                <td style="padding: 0 24px 24px 24px;">
-                  <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Attached Invoice</div>
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td style="padding: 4px 0;">
-                        <span style="display: inline-block; background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 500;">
-                          📄 ${invoiceAttachment.filename}
-                        </span>
                       </td>
                     </tr>
                   </table>
@@ -708,8 +1077,7 @@ export async function sendInvoiceEmail(
               <tr>
                 <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
                   <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
-                    Impact Direct – Invoice Notification<br>
-                    Payment Terms: 2% 30, Net 60
+                    EPG Inventory Release &ndash; Internal Invoice Reminder
                   </div>
                 </td>
               </tr>
@@ -722,60 +1090,46 @@ export async function sendInvoiceEmail(
     </html>
   `
 
-  // Plain text version
   const textBody = `
-INVOICE - ${emailData.releaseNumber}
+INVOICE NEEDED - ${emailData.releaseNumber}
 
-SHIP DATE: ${shipDateStr}
-ETA DELIVERY: ${etaStr}
+This job is shipping today and needs to be invoiced.
 
-RELEASE DETAILS
 Release Number: ${emailData.releaseNumber}
 Customer PO #: ${emailData.customerPONumber}
-
-PRODUCT INFORMATION
 Part Number: ${emailData.partNumber}
 Description: ${emailData.partDescription}
+Ship Date: ${shipDateStr}
 Total Units: ${emailData.totalUnits.toLocaleString()}
-
-SHIPPING INFORMATION
 Ship To: ${emailData.shippingLocation}
-
-INVOICE TOTAL: ${emailData.invoiceTotal}
-
-Payment Terms: 2% 30, Net 60
-
-Attached: ${invoiceAttachment.filename}
+Invoice Amount: ${emailData.invoiceTotal}
 
 ---
-Impact Direct - Invoice Notification
+EPG Inventory Release - Internal Invoice Reminder
   `
 
   const msg = {
     to: emailTo,
-    cc: emailCc,
     from: {
       email: emailFrom,
       name: emailFromName,
     },
-    subject: `Invoice - ${emailData.releaseNumber} - Ship Date ${shipDateStr}`,
+    subject: `Invoice Needed - ${emailData.releaseNumber} - ${emailData.partNumber}`,
     text: textBody,
     html: htmlBody,
-    attachments: [sgAttachment],
   }
 
   try {
     if (!apiKey) {
-      console.log('⚠️ SendGrid API key not configured. Invoice email would have been sent to:', emailTo)
-      console.log('📧 Subject:', msg.subject)
-      console.log('📎 Attachment:', invoiceAttachment.filename)
+      console.log('SendGrid API key not configured. Invoice reminder would have been sent to:', emailTo.join(', '))
+      console.log('Subject:', msg.subject)
       return
     }
 
     await sgMail.send(msg)
-    console.log(`✅ Invoice email sent successfully to: ${emailTo}, CC: ${emailCc.join(', ')}`)
+    console.log(`Invoice reminder sent to: ${emailTo.join(', ')}`)
   } catch (error) {
-    console.error('❌ Error sending invoice email:', error)
+    console.error('Error sending invoice reminder email:', error)
     throw error
   }
 }

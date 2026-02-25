@@ -4,7 +4,7 @@ import { getUserFromToken } from '@/lib/auth'
 import { savePackingSlip, generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
 import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
 import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknowledgement'
-import { sendReleaseNotification } from '@/lib/email/sendgrid'
+import { sendReleaseNotification, sendThreeZReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
 import { createThreezPortalJob, isThreezPortalConfigured } from '@/lib/integrations/threez-portal'
 
@@ -300,6 +300,33 @@ export async function POST(request: NextRequest) {
     } catch (emailError) {
       console.error('❌ Email sending failed:', emailError)
       // Don't fail the request - release was created successfully
+    }
+
+    // Email 1B: Three Z release notification (box labels only, ship date prominent)
+    try {
+      await sendThreeZReleaseNotification(
+        {
+          releaseNumber: release.releaseNumber,
+          partNumber: release.part.partNumber,
+          partDescription: release.part.description,
+          pallets: release.pallets,
+          boxes: release.boxes,
+          totalUnits: release.totalUnits,
+          customerPONumber: release.customerPONumber,
+          shippingLocation: release.shippingLocation.name,
+          invoiceTotal: `$${orderTotal.toFixed(2)}`,
+          notes: release.notes || undefined,
+          shipDate: release.shipDate?.toISOString() ?? null,
+        },
+        {
+          filename: 'box-labels.pdf',
+          content: boxLabelsBuffer.toString('base64'),
+        }
+      )
+      console.log('✅ Three Z release email sent for:', release.releaseNumber)
+    } catch (threeZError) {
+      console.error('❌ Three Z release email failed:', threeZError)
+      // Don't fail the request
     }
 
     // 4. Create job in impactd122 via webhook
