@@ -712,7 +712,7 @@ export default function HistoryPage() {
                         </p>
                       </div>
                       <a
-                        href={selectedRelease.customerPackingSlipUrl}
+                        href={`${selectedRelease.customerPackingSlipUrl}${selectedRelease.customerPackingSlipUrl.startsWith('/api') ? `?token=${token}` : ''}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 hover:bg-amber-100 rounded-lg"

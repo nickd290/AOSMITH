@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
-import { uploadPDF } from '@/lib/storage'
 import { sendPackingSlipReadyNotification } from '@/lib/email/sendgrid'
 
 export async function POST(
@@ -49,20 +48,21 @@ export async function POST(
       return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 })
     }
 
-    // Convert file to buffer and upload to R2
+    // Convert file to buffer and store in database
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    const fileName = `customer-packing-slip-${release.releaseNumber}-${file.name}`
 
-    const { url } = await uploadPDF(buffer, fileName)
+    // Build the serve URL for this file
+    const slipUrl = `/api/releases/${releaseId}/packing-slip-file`
 
-    // Update release record
+    // Update release record with PDF data stored in DB
     const updatedRelease = await prisma.release.update({
       where: { id: releaseId },
       data: {
-        customerPackingSlipUrl: url,
+        customerPackingSlipUrl: slipUrl,
         customerPackingSlipName: file.name,
         customerPackingSlipUploadedAt: new Date(),
+        customerPackingSlipData: buffer,
       },
       include: {
         part: true,
