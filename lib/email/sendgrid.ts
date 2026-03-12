@@ -35,7 +35,7 @@ export async function sendReleaseNotification(
   attachments: EmailAttachment[]
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'JD Graphic'
   const emailTo = process.env.EMAIL_TO || 'nick@jdgraphic.com'
   const emailCc = process.env.EMAIL_CC || ''
 
@@ -79,7 +79,7 @@ export async function sendReleaseNotification(
 
               <!-- Header -->
               <tr>
-                <td style="background: linear-gradient(135deg, #1a4d6b 0%, #0d3147 100%); padding: 20px 24px;">
+                <td style="background: linear-gradient(135deg, #1C2A3A 0%, #0F1A24 100%); padding: 20px 24px;">
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                     <tr>
                       <td style="vertical-align: middle;">
@@ -100,7 +100,7 @@ export async function sendReleaseNotification(
               <!-- Main Content Card -->
               <tr>
                 <td style="padding: 24px; background-color: #ffffff;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #1a4d6b; border-radius: 4px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #1C2A3A; border-radius: 4px;">
                     <tr>
                       <td style="padding: 16px 20px;">
 
@@ -189,7 +189,7 @@ export async function sendReleaseNotification(
               <!-- Invoice Total Highlight -->
               <tr>
                 <td style="padding: 0 24px 24px 24px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #1a4d6b 0%, #0d3147 100%); border-radius: 6px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #1C2A3A 0%, #0F1A24 100%); border-radius: 6px;">
                     <tr>
                       <td style="padding: 18px 24px; text-align: center;">
                         <div style="color: #93c5fd; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Invoice Total</div>
@@ -222,7 +222,7 @@ export async function sendReleaseNotification(
               <tr>
                 <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
                   <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
-                    Enterprise Print Group – Automated Release Notification
+                    JD Graphic, Co Inc — Inventory Release System
                   </div>
                 </td>
               </tr>
@@ -263,7 +263,7 @@ Invoice Total: ${emailData.invoiceTotal}
 Attached Documents: ${attachments.map(att => att.filename).join(', ')}
 
 ---
-Enterprise Print Group - Automated Release Notification
+JD Graphic, Co Inc - Inventory Release System
   `
 
   const msg = {
@@ -308,7 +308,7 @@ export async function sendThreeZReleaseNotification(
   boxLabelsAttachment: EmailAttachment
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'JD Graphic'
 
   const threeZTo = ['jkoester@threez.com', 'dmeinhart@threez.com']
 
@@ -338,7 +338,7 @@ export async function sendThreeZReleaseNotification(
 
               <!-- Header -->
               <tr>
-                <td style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); padding: 20px 24px;">
+                <td style="background: linear-gradient(135deg, #1C2A3A 0%, #0F1A24 100%); padding: 20px 24px;">
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                     <tr>
                       <td style="vertical-align: middle;">
@@ -358,10 +358,10 @@ export async function sendThreeZReleaseNotification(
 
               <!-- Ship Date Banner (PROMINENT) -->
               <tr>
-                <td style="padding: 24px; background-color: #faf5ff; border-bottom: 3px solid #7c3aed;">
+                <td style="padding: 24px; background-color: #f0f4f8; border-bottom: 3px solid #1C2A3A;">
                   <div style="text-align: center;">
-                    <div style="font-size: 11px; color: #6b21a8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Ship Date</div>
-                    <div style="font-size: 24px; color: #5b21b6; font-weight: 800;">${shipDateStr}</div>
+                    <div style="font-size: 11px; color: #1C2A3A; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Ship Date</div>
+                    <div style="font-size: 24px; color: #0F1A24; font-weight: 800;">${shipDateStr}</div>
                   </div>
                 </td>
               </tr>
@@ -378,7 +378,7 @@ export async function sendThreeZReleaseNotification(
               <!-- Main Content Card -->
               <tr>
                 <td style="padding: 24px; background-color: #ffffff;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #7c3aed; border-radius: 4px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fafafa; border-left: 4px solid #1C2A3A; border-radius: 4px;">
                     <tr>
                       <td style="padding: 16px 20px;">
                         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -538,7 +538,7 @@ export async function sendThreeZShipNotification(
   packingSlipAttachment: EmailAttachment
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'JD Graphic'
 
   const threeZTo = ['jkoester@threez.com', 'dmeinhart@threez.com']
 
@@ -755,7 +755,7 @@ export async function sendPackingSlipReadyNotification(
   attachment: EmailAttachment
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'JD Graphic'
   const emailTo = process.env.EMAIL_TO || 'nick@jdgraphic.com'
   const emailCc = process.env.EMAIL_CC || ''
 
@@ -807,7 +807,7 @@ export async function sendPackingSlipReadyNotification(
               <tr>
                 <td style="padding: 24px; background-color: #fffbeb; border-bottom: 2px solid #f59e0b;">
                   <div style="font-size: 15px; color: #92400e; font-weight: 600; line-height: 1.5;">
-                    EPrint Group has uploaded their packing slip &mdash; this release is ready to ship.
+                    Customer has uploaded their packing slip &mdash; this release is ready to ship.
                   </div>
                 </td>
               </tr>
@@ -885,7 +885,7 @@ export async function sendPackingSlipReadyNotification(
               <tr>
                 <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
                   <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
-                    Enterprise Print Group &ndash; Customer Packing Slip Upload Notification
+                    JD Graphic, Co Inc &ndash; Inventory Release System
                   </div>
                 </td>
               </tr>
@@ -901,7 +901,7 @@ export async function sendPackingSlipReadyNotification(
   const textBody = `
 READY TO SHIP - ${emailData.releaseNumber}
 
-EPrint Group has uploaded their packing slip - this release is ready to ship.
+Customer has uploaded their packing slip - this release is ready to ship.
 
 RELEASE DETAILS
 Release Number: ${emailData.releaseNumber}
@@ -919,7 +919,7 @@ Ship Date: ${shipDateStr}
 Attached: ${attachment.filename}
 
 ---
-Enterprise Print Group - Customer Packing Slip Upload Notification
+JD Graphic, Co Inc - Inventory Release System
   `
 
   const msg = {
@@ -962,7 +962,7 @@ export async function sendInvoiceReminderEmail(
   emailData: ReleaseEmailData & { shipDate: Date; etaDeliveryDate?: Date | null }
 ): Promise<void> {
   const emailFrom = process.env.EMAIL_FROM || 'noreply@jdgraphic.com'
-  const emailFromName = process.env.EMAIL_FROM_NAME || 'EPG Release'
+  const emailFromName = process.env.EMAIL_FROM_NAME || 'JD Graphic'
 
   // Internal JD team recipients
   const emailTo = ['john@jdgraphic.com', 'brenda@jdgraphic.com', 'crista@jdgraphic.com']
@@ -1077,7 +1077,7 @@ export async function sendInvoiceReminderEmail(
               <tr>
                 <td style="padding: 16px 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center;">
                   <div style="color: #6b7280; font-size: 11px; line-height: 1.5;">
-                    EPG Inventory Release &ndash; Internal Invoice Reminder
+                    JD Graphic, Co Inc &ndash; Internal Invoice Reminder
                   </div>
                 </td>
               </tr>
@@ -1105,7 +1105,7 @@ Ship To: ${emailData.shippingLocation}
 Invoice Amount: ${emailData.invoiceTotal}
 
 ---
-EPG Inventory Release - Internal Invoice Reminder
+JD Graphic, Co Inc - Internal Invoice Reminder
   `
 
   const msg = {

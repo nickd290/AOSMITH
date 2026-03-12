@@ -264,8 +264,7 @@ export async function POST(request: NextRequest) {
     const orderAckBuffer = generateOrderAcknowledgementBuffer(orderAckData)
 
     // 3. Send Email Notification with PDF buffers (no filesystem dependency)
-    // Send: Packing Slip, Box Labels, Order Acknowledgement (NOT Invoice)
-    // Invoice will be sent separately on Ship Date
+    // Send: Box Labels only (packing slip uploaded later by customer, invoice sent on ship date)
     try {
       await sendReleaseNotification(
         {
@@ -282,16 +281,8 @@ export async function POST(request: NextRequest) {
         },
         [
           {
-            filename: 'packing-slip.pdf',
-            content: packingSlipBuffer.toString('base64'),
-          },
-          {
             filename: 'box-labels.pdf',
             content: boxLabelsBuffer.toString('base64'),
-          },
-          {
-            filename: 'order-acknowledgement.pdf',
-            content: orderAckBuffer.toString('base64'),
           },
         ]
       )
@@ -413,6 +404,11 @@ export async function POST(request: NextRequest) {
         title: `EPG Release — ${release.part.partNumber} — ${release.totalUnits.toLocaleString()} units`,
         customerName: 'EPrint Group',
         emailBody: releaseDetails,
+        sourceJobId: release.id,
+        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/threez-status`,
+        shipDate: release.shipDate ? new Date(release.shipDate).toISOString() : undefined,
+        carrier: release.shipVia || undefined,
+        source: 'eprint-release',
       }).catch((err) =>
         console.error('[threez-portal] Failed for release:', release.releaseNumber, err)
       )

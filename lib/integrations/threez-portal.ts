@@ -11,6 +11,11 @@ interface ThreezJobPayload {
   title: string
   customerName: string
   emailBody: string
+  sourceJobId?: string    // Release ID from inventory-release-app
+  callbackUrl?: string    // URL for status update callbacks
+  shipDate?: string       // Requested ship date (ISO string)
+  carrier?: string        // Pre-set carrier if known
+  source?: string         // Source identifier
 }
 
 interface ThreezJobResult {
