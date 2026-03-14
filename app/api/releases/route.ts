@@ -7,6 +7,8 @@ import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknow
 import { sendReleaseNotification, sendThreeZReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
 import { createThreezPortalJob, isThreezPortalConfigured } from '@/lib/integrations/threez-portal'
+import { createJdInvoicingJob, isJdInvoicingConfigured } from '@/lib/integrations/jd-invoicing'
+import { createRmgtSchedulerJob, isRmgtSchedulerConfigured } from '@/lib/integrations/rmgt-scheduler'
 
 export async function POST(request: NextRequest) {
   try {
@@ -411,6 +413,48 @@ export async function POST(request: NextRequest) {
         source: 'eprint-release',
       }).catch((err) =>
         console.error('[threez-portal] Failed for release:', release.releaseNumber, err)
+      )
+    }
+
+    // Ship date string for integrations (YYYY-MM-DD)
+    const shipDateStr = release.shipDate
+      ? new Date(release.shipDate).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+
+    // 6. Create job in JD Invoicing (for tracking + invoicing — no press needed)
+    if (isJdInvoicingConfigured()) {
+      createJdInvoicingJob({
+        client: 'EPG Enterprise Print Group',
+        description: `${release.part.partNumber} — ${release.part.description} | ${release.releaseNumber}`,
+        quantity: String(release.totalUnits),
+        poNumber: release.customerPONumber,
+        dueDate: shipDateStr,
+        pressType: 'digital-inkjet',
+        jobType: 'inventory-release',
+        notes: `INVENTORY RELEASE | ${release.releaseNumber} | ${release.ticketNumber} | Ship to: ${release.shippingLocation.name} via ${release.shipVia || 'Averitt Collect'}`,
+        releaseNumber: release.releaseNumber,
+      }).catch((err) =>
+        console.error('[jd-invoicing] Failed for release:', release.releaseNumber, err)
+      )
+    }
+
+    // 7. Create job in RMGT Scheduler (marked complete — no press time needed, just for visibility)
+    if (isRmgtSchedulerConfigured()) {
+      createRmgtSchedulerJob({
+        customer: 'EPG Enterprise Print Group',
+        customerCode: '2686',
+        projectName: `${release.part.partNumber} — ${release.part.description}`,
+        quantity: release.totalUnits,
+        category: 'OTHER',
+        product: 'inventory-release',
+        equipment: 'screen-1',
+        dueDate: shipDateStr,
+        purchaseOrder: release.customerPONumber,
+        productionNotes: `INVENTORY RELEASE | ${release.releaseNumber} | Ship to: ${release.shippingLocation.name}`,
+        source: 'inventory-release',
+        status: 'complete',
+      }).catch((err) =>
+        console.error('[rmgt-scheduler] Failed for release:', release.releaseNumber, err)
       )
     }
 
