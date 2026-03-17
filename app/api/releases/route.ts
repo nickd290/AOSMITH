@@ -406,11 +406,14 @@ export async function POST(request: NextRequest) {
         title: `EPG Release — ${release.part.partNumber} — ${release.totalUnits.toLocaleString()} units`,
         customerName: 'EPrint Group',
         emailBody: releaseDetails,
+        releaseNumber: release.releaseNumber,
+        quantity: release.totalUnits,
         sourceJobId: release.id,
         callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/threez-status`,
         shipDate: release.shipDate ? new Date(release.shipDate).toISOString() : undefined,
         carrier: release.shipVia || undefined,
         source: 'eprint-release',
+        customerPONumber: release.customerPONumber || undefined,
       }).catch((err) =>
         console.error('[threez-portal] Failed for release:', release.releaseNumber, err)
       )

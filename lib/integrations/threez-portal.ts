@@ -11,11 +11,14 @@ interface ThreezJobPayload {
   title: string
   customerName: string
   emailBody: string
+  releaseNumber?: string  // Human-readable release ref: "REL-20260317-0021"
+  quantity?: number       // Total units being released
   sourceJobId?: string    // Release ID from inventory-release-app
   callbackUrl?: string    // URL for status update callbacks
   shipDate?: string       // Requested ship date (ISO string)
   carrier?: string        // Pre-set carrier if known
   source?: string         // Source identifier
+  customerPONumber?: string // EPG purchase order number
 }
 
 interface ThreezJobResult {
