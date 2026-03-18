@@ -18,7 +18,7 @@ interface ThreezJobPayload {
   shipDate?: string       // Requested ship date (ISO string)
   carrier?: string        // Pre-set carrier if known
   source?: string         // Source identifier
-  customerPONumber?: string // EPG purchase order number
+  poNumber?: string // EPG purchase order number (matches threez-portal field name)
 }
 
 interface ThreezJobResult {

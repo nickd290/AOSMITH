@@ -413,7 +413,7 @@ export async function POST(request: NextRequest) {
         shipDate: release.shipDate ? new Date(release.shipDate).toISOString() : undefined,
         carrier: release.shipVia || undefined,
         source: 'eprint-release',
-        customerPONumber: release.customerPONumber || undefined,
+        poNumber: release.customerPONumber || undefined,
       }).catch((err) =>
         console.error('[threez-portal] Failed for release:', release.releaseNumber, err)
       )
