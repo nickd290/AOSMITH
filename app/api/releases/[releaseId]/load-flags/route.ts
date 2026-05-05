@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
 import { generateLoadFlagsBuffer, type LoadFlagSkid } from '@/lib/documents/load-flags'
-import { EPG_DEFAULT_CARRIER } from '@/lib/epg'
+import { EPG_DEFAULT_CARRIER, EPG_DEFAULT_LBS_PER_PALLET } from '@/lib/epg'
 
 export async function GET(
   request: NextRequest,
@@ -52,7 +52,10 @@ export async function GET(
     const totalUnits = release.totalUnits
     const totalCartons =
       release.cartons ?? release.pallets * release.part.boxesPerPallet + release.boxes
-    const totalWeight = release.weight ?? 0
+    const totalWeight =
+      release.weight && release.weight > 0
+        ? release.weight
+        : pallets * EPG_DEFAULT_LBS_PER_PALLET
 
     // Even-split per skid, remainder on the LAST skid (pallet N).
     const baseUnits = Math.floor(totalUnits / pallets)

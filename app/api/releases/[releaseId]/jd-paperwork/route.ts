@@ -21,6 +21,7 @@ import {
   EPG_DEFAULT_CARRIER,
   EPG_DEFAULT_CARRIER_ACCOUNT,
   EPG_DEFAULT_FREIGHT_TERMS,
+  EPG_DEFAULT_LBS_PER_PALLET,
 } from '@/lib/epg'
 
 export async function GET(
@@ -64,8 +65,12 @@ export async function GET(
     const carrier = release.carrier || EPG_DEFAULT_CARRIER
     const carrierAccountNumber =
       release.carrierAccountNumber || EPG_DEFAULT_CARRIER_ACCOUNT
-    const totalWeight = release.weight ?? 0
+    const totalWeight =
+      release.weight && release.weight > 0
+        ? release.weight
+        : Math.max(1, release.pallets) * EPG_DEFAULT_LBS_PER_PALLET
     const shippingClass = release.shippingClass || '55'
+    const freightTerms = release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS
 
     const doc = generateJdShipmentPaperwork({
       releaseNumber: release.releaseNumber,
@@ -75,7 +80,7 @@ export async function GET(
       shipDate: release.shipDate ?? null,
       carrier,
       carrierAccountNumber,
-      freightTerms: release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS,
+      freightTerms,
       pallets: release.pallets,
       cartons,
       weight: totalWeight,

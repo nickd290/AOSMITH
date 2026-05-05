@@ -41,4 +41,7 @@ export const EPG_DEFAULT_CARRIER = 'XPO'
 export const EPG_DEFAULT_CARRIER_ACCOUNT = 'JDGRCCTS900'
 export const EPG_DEFAULT_FREIGHT_TERMS = 'Prepaid'
 
+/** Fallback weight when release.weight is 0/null. EPG manual pallet ≈ 1000 lbs. */
+export const EPG_DEFAULT_LBS_PER_PALLET = 1000
+
 export const EPG_LOCATION_NAME = EPG_SHIP_TO.name
