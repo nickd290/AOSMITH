@@ -770,21 +770,14 @@ function HistoryPageInner() {
                     JD Shipment Paperwork
                   </h3>
                   <p className="text-xs text-brand-ink-mute mb-3">
-                    JD-branded packing slip + BOL for XPO pickup. Print and attach to skids before pickup.
+                    JD-branded packing slip + BOL + one pallet flag per skid for XPO pickup. Print and attach flags to skids before pickup.
                   </p>
                   <button
                     onClick={() => openJdPaperwork(selectedRelease.id)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Open JD Packing Slip + BOL
-                  </button>
-                  <button
-                    onClick={() => openPalletFlags(selectedRelease.id)}
-                    className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open Pallet Flags ({selectedRelease.pallets} skid{selectedRelease.pallets === 1 ? '' : 's'})
+                    Open JD Paperwork ({2 + selectedRelease.pallets} pages: Slip + BOL + {selectedRelease.pallets} Flag{selectedRelease.pallets === 1 ? '' : 's'})
                   </button>
                 </div>
               )}

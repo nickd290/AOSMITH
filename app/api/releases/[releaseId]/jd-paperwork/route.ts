@@ -1,7 +1,8 @@
 /**
  * GET /api/releases/[releaseId]/jd-paperwork
  *
- * Returns a 2-page PDF (JD packing slip + BOL) for the release. Admin-only.
+ * Returns a single PDF: JD packing slip + BOL + one pallet flag per skid.
+ * Admin-only.
  *
  * Per Apr 2026 EPG new process: JD ships EPG releases on JD's own paperwork
  * (XPO on JD account JDGRCCTS900, manual phone booking). The shipping party
@@ -11,7 +12,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
-import { generateJdShipmentPaperworkBuffer } from '@/lib/documents/jd-shipment-paperwork'
+import { generateJdShipmentPaperwork } from '@/lib/documents/jd-shipment-paperwork'
+import {
+  appendLoadFlagsPages,
+  type LoadFlagSkid,
+} from '@/lib/documents/load-flags'
 import {
   EPG_DEFAULT_CARRIER,
   EPG_DEFAULT_CARRIER_ACCOUNT,
@@ -56,21 +61,25 @@ export async function GET(
 
     const cartons =
       release.cartons ?? release.pallets * release.part.boxesPerPallet + release.boxes
+    const carrier = release.carrier || EPG_DEFAULT_CARRIER
+    const carrierAccountNumber =
+      release.carrierAccountNumber || EPG_DEFAULT_CARRIER_ACCOUNT
+    const totalWeight = release.weight ?? 0
+    const shippingClass = release.shippingClass || '55'
 
-    const pdf = generateJdShipmentPaperworkBuffer({
+    const doc = generateJdShipmentPaperwork({
       releaseNumber: release.releaseNumber,
       ticketNumber: release.ticketNumber || 'N/A',
       customerPONumber: release.customerPONumber,
       date: release.createdAt,
       shipDate: release.shipDate ?? null,
-      carrier: release.carrier || EPG_DEFAULT_CARRIER,
-      carrierAccountNumber:
-        release.carrierAccountNumber || EPG_DEFAULT_CARRIER_ACCOUNT,
+      carrier,
+      carrierAccountNumber,
       freightTerms: release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS,
       pallets: release.pallets,
       cartons,
-      weight: release.weight ?? 0,
-      shippingClass: release.shippingClass || '55',
+      weight: totalWeight,
+      shippingClass,
       skidType: release.skidType,
       notes: release.notes,
       lineItems: [
@@ -83,6 +92,44 @@ export async function GET(
         },
       ],
     })
+
+    // Append one pallet flag page per skid (even-split units/cartons/weight,
+    // remainder on the last skid).
+    const palletCount = Math.max(1, release.pallets)
+    const baseUnits = Math.floor(release.totalUnits / palletCount)
+    const baseCartons = Math.floor(cartons / palletCount)
+    const baseWeight = Math.round((totalWeight / palletCount) * 100) / 100
+    const skids: LoadFlagSkid[] = Array.from({ length: palletCount }, (_, i) => {
+      const skidNumber = i + 1
+      const isLast = skidNumber === palletCount
+      return {
+        skidNumber,
+        partNumber: release.part.partNumber,
+        description: release.part.description,
+        unitsPerBox: release.part.unitsPerBox,
+        units: isLast
+          ? release.totalUnits - baseUnits * (palletCount - 1)
+          : baseUnits,
+        cartons: isLast ? cartons - baseCartons * (palletCount - 1) : baseCartons,
+        weight: isLast
+          ? Math.round((totalWeight - baseWeight * (palletCount - 1)) * 100) / 100
+          : baseWeight,
+      }
+    })
+    appendLoadFlagsPages(doc, {
+      releaseNumber: release.releaseNumber,
+      date: release.createdAt,
+      carrier,
+      customerPONumber: release.customerPONumber,
+      totalSkids: palletCount,
+      totalWeight,
+      shippingClass,
+      skidType: release.skidType,
+      batchNumber: release.batchNumber ?? undefined,
+      skids,
+    })
+
+    const pdf = Buffer.from(doc.output('arraybuffer'))
 
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,

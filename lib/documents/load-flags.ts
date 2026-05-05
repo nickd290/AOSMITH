@@ -242,6 +242,14 @@ export function generateLoadFlags(data: LoadFlagsData): jsPDF {
   return doc
 }
 
+/** Append one skid page per pallet to an existing PDF (no leading addPage on first). */
+export function appendLoadFlagsPages(doc: jsPDF, data: LoadFlagsData): void {
+  data.skids.forEach((skid) => {
+    doc.addPage('letter', 'portrait')
+    drawSkidPage(doc, data, skid)
+  })
+}
+
 export function generateLoadFlagsBuffer(data: LoadFlagsData): Buffer {
   const doc = generateLoadFlags(data)
   return Buffer.from(doc.output('arraybuffer'))
