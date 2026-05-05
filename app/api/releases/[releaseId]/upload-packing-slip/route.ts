@@ -1,136 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { getUserFromToken } from '@/lib/auth'
-import { sendPackingSlipReadyNotification, sendThreeZShipNotification } from '@/lib/email/sendgrid'
+import { NextResponse } from 'next/server'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ releaseId: string }> }
-) {
-  try {
-    const authHeader = request.headers.get('authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const user = await getUserFromToken(token)
-
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const { releaseId } = await params
-
-    // Get the release with related data
-    const release = await prisma.release.findUnique({
-      where: { id: releaseId },
-      include: {
-        part: true,
-        shippingLocation: true,
-      },
-    })
-
-    if (!release) {
-      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
-    }
-
-    // Parse multipart form data
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
-
-    if (file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 })
-    }
-
-    // Convert file to buffer and store in database
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // Build the serve URL for this file
-    const slipUrl = `/api/releases/${releaseId}/packing-slip-file`
-
-    // Update release record with PDF data stored in DB
-    const updatedRelease = await prisma.release.update({
-      where: { id: releaseId },
-      data: {
-        customerPackingSlipUrl: slipUrl,
-        customerPackingSlipName: file.name,
-        customerPackingSlipUploadedAt: new Date(),
-        customerPackingSlipData: buffer,
-      },
-      include: {
-        part: true,
-        shippingLocation: true,
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
-    })
-
-    // Send "Ready to Ship" email with the PDF attached
-    const loc = release.shippingLocation
-    try {
-      await sendPackingSlipReadyNotification(
-        {
-          releaseNumber: release.releaseNumber,
-          customerPONumber: release.customerPONumber,
-          partNumber: release.part.partNumber,
-          partDescription: release.part.description,
-          totalUnits: release.totalUnits,
-          pallets: release.pallets,
-          boxes: release.boxes,
-          shippingLocation: `${loc.name} - ${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`,
-          shipDate: release.shipDate?.toISOString() ?? null,
-        },
-        {
-          filename: file.name,
-          content: buffer.toString('base64'),
-          type: 'application/pdf',
-        }
-      )
-    } catch (emailError) {
-      // Log but don't fail the upload if email fails
-      console.error('Failed to send Ready to Ship email:', emailError)
-    }
-
-    // Email 2B: Three Z ship authorization (customer's packing slip attached)
-    try {
-      await sendThreeZShipNotification(
-        {
-          releaseNumber: release.releaseNumber,
-          customerPONumber: release.customerPONumber,
-          partNumber: release.part.partNumber,
-          partDescription: release.part.description,
-          totalUnits: release.totalUnits,
-          pallets: release.pallets,
-          boxes: release.boxes,
-          shippingLocation: `${loc.name} - ${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`,
-          shipDate: release.shipDate?.toISOString() ?? null,
-        },
-        {
-          filename: file.name,
-          content: buffer.toString('base64'),
-          type: 'application/pdf',
-        }
-      )
-    } catch (threeZError) {
-      console.error('Failed to send Three Z ship email:', threeZError)
-    }
-
-    // Strip binary data from response
-    const { customerPackingSlipData, ...releaseWithoutData } = updatedRelease
-    return NextResponse.json({ release: releaseWithoutData })
-  } catch (error) {
-    console.error('Error uploading customer packing slip:', error)
-    return NextResponse.json({ error: 'An error occurred' }, { status: 500 })
-  }
+/**
+ * Customer packing-slip upload — DISABLED Apr 2026.
+ *
+ * Per Kirk Icuss new EPG process: "We will not be uploading any paperwork as we
+ * have in the past." JD now generates its own packing slip + BOL via
+ * GET /api/releases/[releaseId]/jd-paperwork. The upload UI was removed from
+ * the customer-facing release history page in the same release.
+ *
+ * Returning 410 Gone (vs. 404) so any stale browser tab or external integration
+ * gets a clear "this is intentionally retired" signal rather than thinking it's
+ * a bug.
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        'Customer packing-slip upload is disabled. JD now generates shipment paperwork via GET /api/releases/[releaseId]/jd-paperwork.',
+    },
+    { status: 410 },
+  )
 }

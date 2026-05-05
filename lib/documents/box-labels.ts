@@ -83,9 +83,9 @@ function generateSingleBoxLabel(
 
   // Generate barcode for quantity
   const quantityBarcode = generateBarcodeWithValue(data.unitsPerBox.toString(), {
-    width: 1.5,
-    height: 40,
-    fontSize: 12,
+    width: 4,
+    height: 80,
+    fontSize: 22,
   })
 
   doc.addImage(quantityBarcode, 'PNG', topRightX, topRightY + 0.05, 2.0, 0.55)
@@ -100,9 +100,9 @@ function generateSingleBoxLabel(
 
   // Generate barcode for part number
   const partBarcode = generateBarcodeWithValue(data.partNumber, {
-    width: 1.5,
-    height: 40,
-    fontSize: 12,
+    width: 4,
+    height: 80,
+    fontSize: 22,
   })
 
   doc.addImage(partBarcode, 'PNG', midLeftX, midLeftY + 0.05, 2.0, 0.55)
@@ -117,9 +117,9 @@ function generateSingleBoxLabel(
 
   // Generate barcode for batch number
   const batchBarcode = generateBarcodeWithValue(data.batchNumber, {
-    width: 1.5,
-    height: 40,
-    fontSize: 12,
+    width: 4,
+    height: 80,
+    fontSize: 22,
   })
 
   doc.addImage(batchBarcode, 'PNG', midRightX, midRightY + 0.05, 2.0, 0.55)

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, Upload } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, CheckCircle2, ExternalLink } from 'lucide-react'
 
 interface Release {
   id: string
@@ -29,6 +29,10 @@ interface Release {
   customerPackingSlipUrl?: string | null
   customerPackingSlipName?: string | null
   customerPackingSlipUploadedAt?: string | null
+  proNumber?: string | null
+  carrier?: string | null
+  shippedAt?: string | null
+  shippedByUserId?: string | null
   part: {
     partNumber: string
     description: string
@@ -50,8 +54,23 @@ interface Release {
 }
 
 export default function HistoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-brand-cream">
+          <div className="text-sm tracking-widest uppercase text-brand-ink-mute">Loading…</div>
+        </div>
+      }
+    >
+      <HistoryPageInner />
+    </Suspense>
+  )
+}
+
+function HistoryPageInner() {
   const { user, isAuthenticated, isLoading: authLoading, token } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [releases, setReleases] = useState<Release[]>([])
   const [filteredReleases, setFilteredReleases] = useState<Release[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -74,9 +93,12 @@ export default function HistoryPage() {
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Customer packing slip upload state
-  const [isUploadingSlip, setIsUploadingSlip] = useState(false)
-  const [slipFile, setSlipFile] = useState<File | null>(null)
+  // Mark Shipped state (Apr 2026 EPG new process — replaces customer packing-slip upload)
+  const [isMarkingShipped, setIsMarkingShipped] = useState(false)
+  const [showMarkShippedForm, setShowMarkShippedForm] = useState(false)
+  const [proNumberInput, setProNumberInput] = useState('')
+  const [carrierInput, setCarrierInput] = useState('XPO')
+  const [shipDateInput, setShipDateInput] = useState('')
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -99,9 +121,26 @@ export default function HistoryPage() {
     if (selectedRelease) {
       setTrackingNumber(selectedRelease.trackingNumber || '')
       setShipDate(selectedRelease.shipDate ? selectedRelease.shipDate.split('T')[0] : '')
-      setSlipFile(null)
+      setProNumberInput(selectedRelease.proNumber || '')
+      setCarrierInput(selectedRelease.carrier || 'XPO')
+      setShipDateInput(new Date().toISOString().split('T')[0])
+      setShowMarkShippedForm(false)
     }
   }, [selectedRelease])
+
+  // Deep links from email: ?openRelease=<id> opens the sidebar; ?markShip=<id> also opens the Mark Shipped form.
+  useEffect(() => {
+    if (!releases.length || !searchParams) return
+    const openId = searchParams.get('openRelease') || searchParams.get('markShip')
+    if (!openId) return
+    const target = releases.find((r) => r.id === openId)
+    if (target) {
+      setSelectedRelease(target)
+      if (searchParams.get('markShip')) {
+        setShowMarkShippedForm(true)
+      }
+    }
+  }, [releases, searchParams])
 
   const fetchReleases = async () => {
     try {
@@ -271,45 +310,69 @@ export default function HistoryPage() {
     }
   }
 
-  const uploadCustomerPackingSlip = async () => {
-    if (!selectedRelease || !slipFile) return
+  const markShipped = async () => {
+    if (!selectedRelease) return
+    if (!proNumberInput.trim()) {
+      alert('PRO # is required.')
+      return
+    }
+    if (!confirm(`Mark ${selectedRelease.releaseNumber} as SHIPPED?\n\nPRO #: ${proNumberInput.trim()}\nCarrier: ${carrierInput || 'XPO'}\nShip date: ${shipDateInput}\n\nThis will send a confirmation email to EPG.`)) {
+      return
+    }
 
-    setIsUploadingSlip(true)
+    setIsMarkingShipped(true)
     try {
-      const formData = new FormData()
-      formData.append('file', slipFile)
-
-      const response = await fetch(`/api/releases/${selectedRelease.id}/upload-packing-slip`, {
+      const response = await fetch(`/api/releases/${selectedRelease.id}/mark-shipped`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify({
+          proNumber: proNumberInput.trim(),
+          carrier: carrierInput.trim() || 'XPO',
+          shipDate: shipDateInput || undefined,
+        }),
       })
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || 'Failed to upload packing slip')
+        throw new Error(data.error || 'Failed to mark shipped')
       }
 
       const data = await response.json()
-
-      // Update the release in the list
-      setReleases(releases.map(r => r.id === data.release.id ? data.release : r))
+      setReleases(releases.map((r) => (r.id === data.release.id ? data.release : r)))
       setSelectedRelease(data.release)
-      setSlipFile(null)
-
-      alert('Packing slip uploaded successfully! A "Ready to Ship" email has been sent.')
+      setShowMarkShippedForm(false)
+      alert('Marked SHIPPED. Confirmation email sent to EPG (Alecia + cc Kirk + JD team).')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to upload packing slip')
+      alert(err instanceof Error ? err.message : 'Failed to mark shipped')
     } finally {
-      setIsUploadingSlip(false)
+      setIsMarkingShipped(false)
     }
+  }
+
+  const openJdPaperwork = (releaseId: string) => {
+    if (!token) return
+    const url = `/api/releases/${releaseId}/jd-paperwork?token=${encodeURIComponent(token)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const openPalletFlags = (releaseId: string) => {
+    if (!token) return
+    const url = `/api/releases/${releaseId}/load-flags?token=${encodeURIComponent(token)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const downloadReleasesXlsx = () => {
+    if (!token) return
+    const url = `/api/releases/export?token=${encodeURIComponent(token)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   if (authLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-brand-cream">
         <div className="text-lg">Loading...</div>
       </div>
     )
@@ -321,17 +384,27 @@ export default function HistoryPage() {
   // Using dynamic boxesPerPallet from each part instead of hardcoded value
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-brand-cream">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-brand-rule">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Release History</h1>
-            <p className="text-sm text-gray-600 mt-1">Click on a release to view details and update shipping info</p>
+            <h1 className="text-2xl font-bold text-brand-ink">Release History</h1>
+            <p className="text-sm text-brand-ink-mute mt-1">Click on a release to view details and update shipping info</p>
           </div>
-          <Link href="/dashboard" className="text-blue-600 hover:text-blue-700">
-            ← Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-4">
+            {user?.role === 'ADMIN' && (
+              <button
+                onClick={downloadReleasesXlsx}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white text-sm font-medium rounded-lg hover:bg-emerald-800"
+              >
+                Download Excel
+              </button>
+            )}
+            <Link href="/dashboard" className="text-brand-rust hover:text-brand-rust-dark">
+              ← Back to Dashboard
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -345,11 +418,11 @@ export default function HistoryPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter Releases</h2>
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-lg font-semibold text-brand-ink mb-4">Filter Releases</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-brand-ink-soft mb-2">
                   Search by Release #, Part # or PO#
                 </label>
                 <input
@@ -357,15 +430,15 @@ export default function HistoryPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="REL-20250101-0001 or PO#"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Part Number</label>
+                <label className="block text-sm font-medium text-brand-ink-soft mb-2">Part Number</label>
                 <select
                   value={selectedPart}
                   onChange={(e) => setSelectedPart(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                 >
                   <option value="">All Parts</option>
                   {uniqueParts.map((part) => (
@@ -376,11 +449,11 @@ export default function HistoryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <label className="block text-sm font-medium text-brand-ink-soft mb-2">Location</label>
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                 >
                   <option value="">All Locations</option>
                   {uniqueLocations.map((location) => (
@@ -398,7 +471,7 @@ export default function HistoryPage() {
                   setSelectedPart('')
                   setSelectedLocation('')
                 }}
-                className="mt-4 text-sm text-blue-600 hover:text-blue-700"
+                className="mt-4 text-sm text-brand-rust hover:text-brand-rust-dark"
               >
                 Clear Filters
               </button>
@@ -407,49 +480,49 @@ export default function HistoryPage() {
 
           {/* Releases List */}
           {isLoading ? (
-            <div className="text-center py-12 text-gray-600">Loading releases...</div>
+            <div className="text-center py-12 text-brand-ink-mute">Loading releases...</div>
           ) : filteredReleases.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-md p-12 text-center">
-              <p className="text-gray-600 mb-4">
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <p className="text-brand-ink-mute mb-4">
                 {releases.length === 0 ? 'No releases found' : 'No releases match your filters'}
               </p>
               {releases.length === 0 && (
                 <Link
                   href="/release"
-                  className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
+                  className="inline-block px-6 py-3 bg-brand-rust text-white font-semibold rounded-lg hover:bg-brand-rust-dark"
                 >
                   Create Your First Release
                 </Link>
               )}
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-gray-50 border-b border-brand-rule">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Release #
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Date
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Part
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Quantity
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Location
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Ship Date
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase tracking-wider">
                         Tracking
                       </th>
                     </tr>
@@ -461,33 +534,33 @@ export default function HistoryPage() {
                         onClick={() => setSelectedRelease(release)}
                         className={`cursor-pointer transition-colors ${
                           selectedRelease?.id === release.id
-                            ? 'bg-blue-50 border-l-4 border-blue-500'
-                            : 'hover:bg-gray-50'
+                            ? 'bg-brand-rust-soft border-l-4 border-brand-rust'
+                            : 'hover:bg-brand-cream-deep'
                         }`}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-ink">
                           {release.releaseNumber}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
                           {new Date(release.createdAt).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink">
                           <div>#{release.part.partNumber}</div>
-                          <div className="text-xs text-gray-500">{release.part.description}</div>
+                          <div className="text-xs text-brand-ink-mute">{release.part.description}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
                           <div>{release.pallets} pallets</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-brand-ink-mute">
                             {release.totalUnits.toLocaleString()} units
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-brand-ink-mute">
                           <div>{release.shippingLocation.name}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-brand-ink-mute">
                             {release.shippingLocation.city}, {release.shippingLocation.state}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
                           {release.shipDate
                             ? new Date(release.shipDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
                             : <span className="text-gray-400">-</span>}
@@ -503,9 +576,9 @@ export default function HistoryPage() {
                             {release.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
                           {release.trackingNumber ? (
-                            <span className="text-blue-600">{release.trackingNumber}</span>
+                            <span className="text-brand-rust">{release.trackingNumber}</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
@@ -520,22 +593,22 @@ export default function HistoryPage() {
 
           {/* Summary */}
           {filteredReleases.length > 0 && (
-            <div className="mt-6 bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary</h3>
+            <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-brand-ink mb-4">Summary</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Releases</p>
-                  <p className="text-2xl font-bold text-gray-900">{filteredReleases.length}</p>
+                  <p className="text-sm text-brand-ink-mute mb-1">Total Releases</p>
+                  <p className="text-2xl font-bold text-brand-ink">{filteredReleases.length}</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Pallets</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-brand-ink-mute mb-1">Total Pallets</p>
+                  <p className="text-2xl font-bold text-brand-ink">
                     {filteredReleases.reduce((sum, r) => sum + r.pallets, 0)}
                   </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Units</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-brand-ink-mute mb-1">Total Units</p>
+                  <p className="text-2xl font-bold text-brand-ink">
                     {filteredReleases.reduce((sum, r) => sum + r.totalUnits, 0).toLocaleString()}
                   </p>
                 </div>
@@ -546,13 +619,13 @@ export default function HistoryPage() {
 
         {/* Details Sidebar */}
         {selectedRelease && (
-          <aside className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl border-l border-gray-200 overflow-y-auto z-50">
+          <aside className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl border-l border-brand-rule overflow-y-auto z-50">
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">{selectedRelease.releaseNumber}</h2>
-                  <p className="text-sm text-gray-600">
+                  <h2 className="text-xl font-bold text-brand-ink">{selectedRelease.releaseNumber}</h2>
+                  <p className="text-sm text-brand-ink-mute">
                     {new Date(selectedRelease.createdAt).toLocaleDateString('en-US', {
                       weekday: 'long',
                       year: 'numeric',
@@ -563,9 +636,9 @@ export default function HistoryPage() {
                 </div>
                 <button
                   onClick={() => setSelectedRelease(null)}
-                  className="p-2 hover:bg-gray-100 rounded-full"
+                  className="p-2 hover:bg-brand-cream-deep rounded-full"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-5 h-5 text-brand-ink-mute" />
                 </button>
               </div>
 
@@ -584,23 +657,23 @@ export default function HistoryPage() {
 
               {/* Part Info */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-2">Part Information</h3>
-                <p className="text-lg font-bold text-blue-600">#{selectedRelease.part.partNumber}</p>
-                <p className="text-sm text-gray-600">{selectedRelease.part.description}</p>
-                <div className="mt-2 text-sm text-gray-500">
+                <h3 className="font-semibold text-brand-ink mb-2">Part Information</h3>
+                <p className="text-lg font-bold text-brand-rust">#{selectedRelease.part.partNumber}</p>
+                <p className="text-sm text-brand-ink-mute">{selectedRelease.part.description}</p>
+                <div className="mt-2 text-sm text-brand-ink-mute">
                   {selectedRelease.part.unitsPerBox} units/box • {selectedRelease.part.boxesPerPallet} boxes/skid
                 </div>
               </div>
 
               {/* Quantity */}
               <div className="mb-6 grid grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600">Pallets</p>
-                  <p className="text-2xl font-bold text-blue-900">{selectedRelease.pallets}</p>
+                <div className="p-4 bg-brand-rust-soft rounded-lg">
+                  <p className="text-sm text-brand-rust">Pallets</p>
+                  <p className="text-2xl font-bold text-brand-ink">{selectedRelease.pallets}</p>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600">Total Units</p>
-                  <p className="text-2xl font-bold text-blue-900">
+                <div className="p-4 bg-brand-rust-soft rounded-lg">
+                  <p className="text-sm text-brand-rust">Total Units</p>
+                  <p className="text-2xl font-bold text-brand-ink">
                     {selectedRelease.totalUnits.toLocaleString()}
                   </p>
                 </div>
@@ -608,10 +681,10 @@ export default function HistoryPage() {
 
               {/* Shipping Info */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-2">Ship To</h3>
+                <h3 className="font-semibold text-brand-ink mb-2">Ship To</h3>
                 <p className="font-medium">{selectedRelease.shippingLocation.name}</p>
-                <p className="text-sm text-gray-600">{selectedRelease.shippingLocation.address}</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-brand-ink-mute">{selectedRelease.shippingLocation.address}</p>
+                <p className="text-sm text-brand-ink-mute">
                   {selectedRelease.shippingLocation.city}, {selectedRelease.shippingLocation.state}{' '}
                   {selectedRelease.shippingLocation.zip}
                 </p>
@@ -620,30 +693,30 @@ export default function HistoryPage() {
               {/* Order Details */}
               <div className="mb-6 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Customer PO#:</span>
+                  <span className="text-brand-ink-mute">Customer PO#:</span>
                   <span className="font-medium">{selectedRelease.customerPONumber}</span>
                 </div>
                 {selectedRelease.ticketNumber && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ticket #:</span>
+                    <span className="text-brand-ink-mute">Ticket #:</span>
                     <span className="font-medium">{selectedRelease.ticketNumber}</span>
                   </div>
                 )}
                 {selectedRelease.batchNumber && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Batch #:</span>
+                    <span className="text-brand-ink-mute">Batch #:</span>
                     <span className="font-medium">{selectedRelease.batchNumber}</span>
                   </div>
                 )}
                 {selectedRelease.shipVia && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ship Via:</span>
+                    <span className="text-brand-ink-mute">Ship Via:</span>
                     <span className="font-medium">{selectedRelease.shipVia}</span>
                   </div>
                 )}
                 {selectedRelease.freightTerms && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Freight Terms:</span>
+                    <span className="text-brand-ink-mute">Freight Terms:</span>
                     <span className="font-medium">{selectedRelease.freightTerms}</span>
                   </div>
                 )}
@@ -651,127 +724,166 @@ export default function HistoryPage() {
 
               {/* Shipping Update Form */}
               <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="font-semibold text-brand-ink mb-4 flex items-center gap-2">
                   <Truck className="w-5 h-5" />
                   Shipping Information
                 </h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      FedEx Tracking Number
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
+                      Tracking Number
                     </label>
                     <input
                       type="text"
                       value={trackingNumber}
                       onChange={(e) => setTrackingNumber(e.target.value)}
                       placeholder="Enter tracking number"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                       Ship Date
                     </label>
                     <input
                       type="date"
                       value={shipDate}
                       onChange={(e) => setShipDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                   <button
                     onClick={updateRelease}
                     disabled={isUpdating}
-                    className="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUpdating ? 'Updating...' : 'Update Shipping Info'}
                   </button>
                 </div>
               </div>
 
-              {/* Customer Packing Slip Upload */}
-              <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Upload className="w-5 h-5" />
-                  Customer Packing Slip
-                </h3>
-                {selectedRelease.customerPackingSlipUrl ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 p-3 bg-white border border-amber-200 rounded-lg">
-                      <FileText className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {selectedRelease.customerPackingSlipName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Uploaded {selectedRelease.customerPackingSlipUploadedAt
-                            ? new Date(selectedRelease.customerPackingSlipUploadedAt).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-                              })
+              {/* JD Shipment Paperwork (Apr 2026 EPG new process) */}
+              {user?.role === 'ADMIN' && (
+                <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <h3 className="font-semibold text-brand-ink mb-2 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-slate-700" />
+                    JD Shipment Paperwork
+                  </h3>
+                  <p className="text-xs text-brand-ink-mute mb-3">
+                    JD-branded packing slip + BOL for XPO pickup. Print and attach to skids before pickup.
+                  </p>
+                  <button
+                    onClick={() => openJdPaperwork(selectedRelease.id)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open JD Packing Slip + BOL
+                  </button>
+                  <button
+                    onClick={() => openPalletFlags(selectedRelease.id)}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open Pallet Flags ({selectedRelease.pallets} skid{selectedRelease.pallets === 1 ? '' : 's'})
+                  </button>
+                </div>
+              )}
+
+              {/* Mark Shipped (Apr 2026 EPG new process — admin only) */}
+              {user?.role === 'ADMIN' && (
+                <div className="mb-6 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <h3 className="font-semibold text-brand-ink mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                    Mark Shipped
+                  </h3>
+                  {selectedRelease.status === 'SHIPPED' ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-white border border-emerald-200 rounded-lg">
+                        <div className="text-xs text-brand-ink-mute uppercase tracking-wider">PRO #</div>
+                        <div className="text-lg font-bold text-emerald-800">{selectedRelease.proNumber || selectedRelease.trackingNumber || '—'}</div>
+                        <div className="text-xs text-brand-ink-mute mt-1">
+                          {selectedRelease.carrier || 'XPO'}
+                          {selectedRelease.shippedAt
+                            ? ` • Shipped ${new Date(selectedRelease.shippedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                             : ''}
-                        </p>
+                        </div>
                       </div>
-                      <a
-                        href={`${selectedRelease.customerPackingSlipUrl}${selectedRelease.customerPackingSlipUrl.startsWith('/api') ? `?token=${token}` : ''}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 hover:bg-amber-100 rounded-lg"
-                        title="View/Download"
-                      >
-                        <Download className="w-4 h-4 text-amber-600" />
-                      </a>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Re-upload packing slip</label>
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
-                        className="w-full text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
-                      />
-                      {slipFile && (
+                  ) : showMarkShippedForm ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-brand-ink-soft mb-1">Carrier PRO #</label>
+                        <input
+                          type="text"
+                          value={proNumberInput}
+                          onChange={(e) => setProNumberInput(e.target.value)}
+                          placeholder="e.g. 1234567890"
+                          className="w-full px-3 py-2 text-sm border border-brand-rule rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-brand-ink-soft mb-1">Carrier</label>
+                        <input
+                          type="text"
+                          value={carrierInput}
+                          onChange={(e) => setCarrierInput(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-brand-rule rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-brand-ink-soft mb-1">Ship Date</label>
+                        <input
+                          type="date"
+                          value={shipDateInput}
+                          onChange={(e) => setShipDateInput(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-brand-rule rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
                         <button
-                          onClick={uploadCustomerPackingSlip}
-                          disabled={isUploadingSlip}
-                          className="mt-2 w-full px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={markShipped}
+                          disabled={isMarkingShipped || !proNumberInput.trim()}
+                          className="flex-1 px-3 py-2 bg-emerald-700 text-white text-sm font-medium rounded-lg hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isUploadingSlip ? 'Uploading...' : 'Re-upload Packing Slip'}
+                          {isMarkingShipped ? 'Marking…' : 'Confirm Shipped'}
                         </button>
-                      )}
+                        <button
+                          onClick={() => setShowMarkShippedForm(false)}
+                          disabled={isMarkingShipped}
+                          className="px-3 py-2 bg-white border border-brand-rule text-brand-ink-soft text-sm font-medium rounded-lg hover:bg-brand-cream-deep"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-brand-ink-mute">
+                        Sends a confirmation email to Alecia (cc Kirk + JD team) with the PRO #.
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
-                      className="w-full text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
-                    />
+                  ) : (
                     <button
-                      onClick={uploadCustomerPackingSlip}
-                      disabled={isUploadingSlip || !slipFile}
-                      className="w-full px-4 py-2 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setShowMarkShippedForm(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-700 text-white font-medium rounded-lg hover:bg-emerald-800"
                     >
-                      {isUploadingSlip ? 'Uploading...' : 'Upload Packing Slip'}
+                      <CheckCircle2 className="w-4 h-4" />
+                      Mark Shipped
                     </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Documents */}
               <div className="mb-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Documents</h3>
+                <h3 className="font-semibold text-brand-ink mb-4">Documents</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => downloadDocument(selectedRelease.id, 'packing-slip')}
                     disabled={downloadingDoc === `${selectedRelease.id}-packing-slip`}
-                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                    className="flex items-center gap-2 p-3 bg-white border border-brand-rule rounded-lg hover:bg-brand-cream-deep w-full disabled:opacity-50"
                   >
                     {downloadingDoc === `${selectedRelease.id}-packing-slip` ? (
-                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-brand-rust animate-spin" />
                     ) : (
-                      <FileText className="w-5 h-5 text-blue-600" />
+                      <FileText className="w-5 h-5 text-brand-rust" />
                     )}
                     <span className="font-medium">Packing Slip</span>
                     <Download className="w-4 h-4 ml-auto text-gray-400" />
@@ -779,7 +891,7 @@ export default function HistoryPage() {
                   <button
                     onClick={() => downloadDocument(selectedRelease.id, 'box-labels')}
                     disabled={downloadingDoc === `${selectedRelease.id}-box-labels`}
-                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                    className="flex items-center gap-2 p-3 bg-white border border-brand-rule rounded-lg hover:bg-brand-cream-deep w-full disabled:opacity-50"
                   >
                     {downloadingDoc === `${selectedRelease.id}-box-labels` ? (
                       <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
@@ -794,7 +906,7 @@ export default function HistoryPage() {
                   <button
                     onClick={() => downloadDocument(selectedRelease.id, 'invoice')}
                     disabled={downloadingDoc === `${selectedRelease.id}-invoice`}
-                    className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 w-full disabled:opacity-50"
+                    className="flex items-center gap-2 p-3 bg-white border border-brand-rule rounded-lg hover:bg-brand-cream-deep w-full disabled:opacity-50"
                   >
                     {downloadingDoc === `${selectedRelease.id}-invoice` ? (
                       <Loader2 className="w-5 h-5 text-purple-600 animate-spin" />
@@ -810,14 +922,14 @@ export default function HistoryPage() {
               {/* Invoice Total */}
               {selectedRelease.part.pricePerUnit && (
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h3 className="font-semibold text-gray-900 mb-2">Invoice Total</h3>
+                  <h3 className="font-semibold text-brand-ink mb-2">Invoice Total</h3>
                   <p className="text-2xl font-bold text-green-700">
                     ${(selectedRelease.totalUnits * selectedRelease.part.pricePerUnit).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-brand-ink-mute mt-1">
                     {selectedRelease.totalUnits.toLocaleString()} units × $
                     {selectedRelease.part.pricePerUnit.toFixed(4)}/unit
                   </p>
@@ -826,11 +938,11 @@ export default function HistoryPage() {
 
               {/* Released By */}
               {user?.role === 'ADMIN' && (
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-600">
+                <div className="mt-6 pt-4 border-t border-brand-rule">
+                  <p className="text-sm text-brand-ink-mute">
                     Released by: <span className="font-medium">{selectedRelease.user.name}</span>
                   </p>
-                  <p className="text-xs text-gray-500">{selectedRelease.user.email}</p>
+                  <p className="text-xs text-brand-ink-mute">{selectedRelease.user.email}</p>
                 </div>
               )}
 
@@ -845,7 +957,7 @@ export default function HistoryPage() {
                     <Trash2 className="w-4 h-4" />
                     {isDeleting ? 'Deleting...' : 'Delete Release'}
                   </button>
-                  <p className="text-xs text-gray-500 mt-2 text-center">
+                  <p className="text-xs text-brand-ink-mute mt-2 text-center">
                     This will restore inventory and cannot be undone
                   </p>
                 </div>

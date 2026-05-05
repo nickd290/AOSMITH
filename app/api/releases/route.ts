@@ -4,11 +4,18 @@ import { getUserFromToken } from '@/lib/auth'
 import { savePackingSlip, generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
 import { saveBoxLabels, generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
 import { generateOrderAcknowledgementBuffer } from '@/lib/documents/order-acknowledgement'
+import { generateJdShipmentPaperworkBuffer } from '@/lib/documents/jd-shipment-paperwork'
 import { sendReleaseNotification, sendThreeZReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
 import { createThreezPortalJob, isThreezPortalConfigured } from '@/lib/integrations/threez-portal'
 import { createJdInvoicingJob, isJdInvoicingConfigured } from '@/lib/integrations/jd-invoicing'
 import { createRmgtSchedulerJob, isRmgtSchedulerConfigured } from '@/lib/integrations/rmgt-scheduler'
+import {
+  EPG_DEFAULT_CARRIER,
+  EPG_DEFAULT_FREIGHT_TERMS,
+  EPG_SHIP_TO,
+  JD_SHIP_FROM,
+} from '@/lib/epg'
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,12 +53,32 @@ export async function POST(request: NextRequest) {
       etaDeliveryDate,
       cartons,
       weight,
-      shippingClass
+      shippingClass,
+      skidType,
     } = await request.json()
 
     if (!partId || !shippingLocationId || !customerPONumber) {
       return NextResponse.json(
         { error: 'Part ID, shipping location ID, and Customer PO# are required' },
+        { status: 400 }
+      )
+    }
+
+    if (skidType !== 'WOOD' && skidType !== 'HEAT_TREATED') {
+      return NextResponse.json(
+        { error: 'Skid type is required (WOOD or HEAT_TREATED)' },
+        { status: 400 }
+      )
+    }
+
+    // Apr 2026 EPG new process — every release must ship to EPG Knoxville.
+    // Belt-and-suspenders against any client bypassing the locked-down form.
+    const requestedLocation = await prisma.shippingLocation.findUnique({
+      where: { id: shippingLocationId },
+    })
+    if (!requestedLocation || requestedLocation.name !== EPG_SHIP_TO.name) {
+      return NextResponse.json(
+        { error: 'Releases must ship to the locked EPG location.' },
         { status: 400 }
       )
     }
@@ -109,14 +136,15 @@ export async function POST(request: NextRequest) {
         customerPONumber,
         ticketNumber,
         batchNumber: generatedBatchNumber,
-        shipVia: shipVia || 'Averitt Collect',
-        freightTerms: freightTerms || 'Prepaid',
+        shipVia: shipVia || EPG_DEFAULT_CARRIER,
+        freightTerms: freightTerms || EPG_DEFAULT_FREIGHT_TERMS,
         paymentTerms: paymentTerms || '2% 30, Net 60',
         shipDate: shipDate ? new Date(shipDate) : new Date(),
         etaDeliveryDate: etaDeliveryDate ? new Date(etaDeliveryDate) : null,
         cartons: cartons || totalBoxesReleased,
         weight: weight || 0,
         shippingClass: shippingClass || '55',
+        skidType,
         notes,
         status: 'COMPLETED',
       },
@@ -152,6 +180,10 @@ export async function POST(request: NextRequest) {
       release.notes
     ].filter(Boolean).join(' | ') || undefined
 
+    // Apr 2026 EPG new process: JD ships from JD Elk Grove to EPG Knoxville on
+    // its own paperwork via FedEx Freight. The legacy EPG-branded packing slip is
+    // still generated for archival/audit, but the email now attaches the JD
+    // packing slip + BOL combo (lib/documents/jd-shipment-paperwork.ts) instead.
     const packingSlipData = {
       releaseNumber: release.releaseNumber,
       ticketNumber: release.ticketNumber || 'N/A',
@@ -166,12 +198,12 @@ export async function POST(request: NextRequest) {
         instructions: shippingInstructions,
       },
       shipFrom: {
-        name: 'Enterprise Print Group',
-        address: '6234 Enterprise Drive',
-        city: 'Knoxville',
-        state: 'TN',
-        zip: '37909',
-        country: 'USA',
+        name: JD_SHIP_FROM.name,
+        address: JD_SHIP_FROM.address,
+        city: JD_SHIP_FROM.city,
+        state: JD_SHIP_FROM.state,
+        zip: JD_SHIP_FROM.zip,
+        country: JD_SHIP_FROM.country,
       },
       lineItems: [
         {
@@ -184,8 +216,8 @@ export async function POST(request: NextRequest) {
           backOrdered: 0,
         },
       ],
-      shipVia: release.shipVia || 'Averitt Collect',
-      freightTerms: release.freightTerms || 'Prepaid',
+      shipVia: release.shipVia || EPG_DEFAULT_CARRIER,
+      freightTerms: release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS,
       paymentTerms: release.paymentTerms || '2% 30, Net 60',
       cartons: release.cartons || (release.pallets * release.part.boxesPerPallet + release.boxes),
       weight: release.weight || 0,
@@ -210,18 +242,18 @@ export async function POST(request: NextRequest) {
       shipDate: release.shipDate || release.createdAt,
       etaDeliveryDate: release.etaDeliveryDate,
       shipTo: {
-        name: release.shippingLocation.name,
-        address: release.shippingLocation.address,
-        city: release.shippingLocation.city,
-        state: release.shippingLocation.state,
-        zip: release.shippingLocation.zip,
+        name: EPG_SHIP_TO.name,
+        address: EPG_SHIP_TO.address,
+        city: EPG_SHIP_TO.city,
+        state: EPG_SHIP_TO.state,
+        zip: EPG_SHIP_TO.zip,
       },
       shipFrom: {
-        name: 'Impact Direct',
-        address: '1550 N Northwest Highway',
-        city: 'Park Ridge',
-        state: 'IL',
-        zip: '60068',
+        name: JD_SHIP_FROM.name,
+        address: JD_SHIP_FROM.address,
+        city: JD_SHIP_FROM.city,
+        state: JD_SHIP_FROM.state,
+        zip: JD_SHIP_FROM.zip,
       },
       lineItems: [
         {
@@ -265,28 +297,74 @@ export async function POST(request: NextRequest) {
     const boxLabelsBuffer = generateBoxLabelsBuffer(boxLabelData)
     const orderAckBuffer = generateOrderAcknowledgementBuffer(orderAckData)
 
-    // 3. Send Email Notification with PDF buffers (no filesystem dependency)
-    // Send: Box Labels only (packing slip uploaded later by customer, invoice sent on ship date)
+    // Apr 2026 EPG new process: also generate JD-branded shipment paperwork
+    // (packing slip + BOL combo). This is what JD physically attaches to the
+    // skids when shipping to EPG Knoxville.
+    let jdPaperworkBuffer: Buffer | null = null
     try {
+      jdPaperworkBuffer = generateJdShipmentPaperworkBuffer({
+        releaseNumber: release.releaseNumber,
+        ticketNumber: release.ticketNumber || 'N/A',
+        customerPONumber: release.customerPONumber,
+        date: release.createdAt,
+        shipDate: release.shipDate ?? null,
+        carrier: release.shipVia || EPG_DEFAULT_CARRIER,
+        freightTerms: release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS,
+        pallets: release.pallets,
+        cartons: release.cartons || (release.pallets * release.part.boxesPerPallet + release.boxes),
+        weight: release.weight ?? 0,
+        shippingClass: release.shippingClass || '55',
+        skidType: release.skidType,
+        notes: release.notes,
+        lineItems: [
+          {
+            partNumber: release.part.partNumber,
+            description: release.part.description,
+            unitsPerBox: release.part.unitsPerBox,
+            ordered: release.totalUnits,
+            shipped: release.totalUnits,
+          },
+        ],
+      })
+    } catch (e) {
+      console.error('⚠️ Failed to generate JD shipment paperwork (continuing):', e)
+    }
+
+    // 3. Send Email Notification with PDF buffers (no filesystem dependency)
+    // JD paperwork (packing slip + BOL) is the primary attachment under the new
+    // process; AOS box labels still ride along so JD applies them per Kirk.
+    try {
+      const releaseAttachments = [
+        ...(jdPaperworkBuffer
+          ? [
+              {
+                filename: `JD-${release.releaseNumber}-paperwork.pdf`,
+                content: jdPaperworkBuffer.toString('base64'),
+              },
+            ]
+          : []),
+        {
+          filename: 'box-labels.pdf',
+          content: boxLabelsBuffer.toString('base64'),
+        },
+      ]
       await sendReleaseNotification(
         {
           releaseNumber: release.releaseNumber,
+          releaseId: release.id,
           partNumber: release.part.partNumber,
           partDescription: release.part.description,
           pallets: release.pallets,
           boxes: release.boxes,
           totalUnits: release.totalUnits,
           customerPONumber: release.customerPONumber,
-          shippingLocation: release.shippingLocation.name,
+          shippingLocation: `${EPG_SHIP_TO.name}, ${EPG_SHIP_TO.city}, ${EPG_SHIP_TO.state}`,
           invoiceTotal: `$${orderTotal.toFixed(2)}`,
           notes: release.notes || undefined,
+          shipDate: release.shipDate?.toISOString() ?? null,
+          skidType: release.skidType,
         },
-        [
-          {
-            filename: 'box-labels.pdf',
-            content: boxLabelsBuffer.toString('base64'),
-          },
-        ]
+        releaseAttachments,
       )
 
       console.log('✅ Email sent for release:', release.releaseNumber)
@@ -295,21 +373,24 @@ export async function POST(request: NextRequest) {
       // Don't fail the request - release was created successfully
     }
 
-    // Email 1B: Three Z release notification (box labels only, ship date prominent)
+    // Email 1B: Three Z release notification (box labels attached so they can
+    // apply if Three Z is the one shipping). No more "DO NOT book truck" gate.
     try {
       await sendThreeZReleaseNotification(
         {
           releaseNumber: release.releaseNumber,
+          releaseId: release.id,
           partNumber: release.part.partNumber,
           partDescription: release.part.description,
           pallets: release.pallets,
           boxes: release.boxes,
           totalUnits: release.totalUnits,
           customerPONumber: release.customerPONumber,
-          shippingLocation: release.shippingLocation.name,
+          shippingLocation: `${EPG_SHIP_TO.name}, ${EPG_SHIP_TO.city}, ${EPG_SHIP_TO.state}`,
           invoiceTotal: `$${orderTotal.toFixed(2)}`,
           notes: release.notes || undefined,
           shipDate: release.shipDate?.toISOString() ?? null,
+          skidType: release.skidType,
         },
         {
           filename: 'box-labels.pdf',
@@ -395,7 +476,7 @@ export async function POST(request: NextRequest) {
         `Customer PO#: ${release.customerPONumber}`,
         `Quantity: ${release.totalUnits.toLocaleString()} units (${release.pallets} pallets, ${release.boxes} boxes)`,
         `Ship To: ${release.shippingLocation.name}`,
-        `Ship Via: ${release.shipVia || 'Averitt Collect'}`,
+        `Ship Via: ${release.shipVia || EPG_DEFAULT_CARRIER}`,
         release.shipDate ? `Ship Date: ${new Date(release.shipDate).toLocaleDateString('en-US')}` : null,
         release.notes ? `Notes: ${release.notes}` : null,
         '',
@@ -434,7 +515,7 @@ export async function POST(request: NextRequest) {
         dueDate: shipDateStr,
         pressType: 'digital-inkjet',
         jobType: 'inventory-release',
-        notes: `INVENTORY RELEASE | ${release.releaseNumber} | ${release.ticketNumber} | Ship to: ${release.shippingLocation.name} via ${release.shipVia || 'Averitt Collect'}`,
+        notes: `INVENTORY RELEASE | ${release.releaseNumber} | Ticket: ${release.ticketNumber ?? 'N/A'} | Batch: ${release.batchNumber ?? 'N/A'} | Ship to: ${release.shippingLocation.name} via ${release.shipVia || EPG_DEFAULT_CARRIER}`,
         releaseNumber: release.releaseNumber,
       }).catch((err) =>
         console.error('[jd-invoicing] Failed for release:', release.releaseNumber, err)

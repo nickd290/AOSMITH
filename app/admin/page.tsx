@@ -214,7 +214,7 @@ export default function AdminPage() {
 
   if (authLoading || !user || user.role !== 'ADMIN') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-brand-cream">
         <div className="text-lg">Loading...</div>
       </div>
     )
@@ -223,22 +223,22 @@ export default function AdminPage() {
   const selectedPart = parts.find((p) => p.id === selectedPartId)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-brand-cream">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-brand-rule">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-sm text-gray-600 mt-1">JD Graphic - Management Portal</p>
+              <h1 className="text-2xl font-bold text-brand-ink">Admin Dashboard</h1>
+              <p className="text-sm text-brand-ink-mute mt-1">JD Graphic - Management Portal</p>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link href="/dashboard" className="text-brand-rust hover:text-brand-rust-dark font-medium">
                 Customer View
               </Link>
               <button
                 onClick={logout}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium"
+                className="px-4 py-2 text-brand-ink-soft hover:bg-brand-cream-deep rounded-lg font-medium"
               >
                 Logout
               </button>
@@ -248,15 +248,15 @@ export default function AdminPage() {
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-brand-rule">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8" aria-label="Tabs">
             <button
               onClick={() => setActiveTab('production')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'production'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand-rust text-brand-rust'
+                  : 'border-transparent text-brand-ink-mute hover:text-brand-ink-soft hover:border-brand-rule'
               }`}
             >
               Production Management
@@ -265,8 +265,8 @@ export default function AdminPage() {
               onClick={() => setActiveTab('billing')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'billing'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand-rust text-brand-rust'
+                  : 'border-transparent text-brand-ink-mute hover:text-brand-ink-soft hover:border-brand-rule'
               }`}
             >
               Billing & Reports
@@ -275,8 +275,8 @@ export default function AdminPage() {
               onClick={() => setActiveTab('inventory')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'inventory'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand-rust text-brand-rust'
+                  : 'border-transparent text-brand-ink-mute hover:text-brand-ink-soft hover:border-brand-rule'
               }`}
             >
               Current Inventory
@@ -297,19 +297,19 @@ export default function AdminPage() {
         {activeTab === 'production' && (
           <div className="space-y-6">
             {/* Add Production Form */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Add Production Run</h2>
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-brand-ink mb-6">Add Production Run</h2>
               <form onSubmit={handleAddProduction} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-2">
                       Part Number
                     </label>
                     <select
                       value={selectedPartId}
                       onChange={(e) => setSelectedPartId(e.target.value)}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                     >
                       <option value="">Select a part...</option>
                       {parts.map((part) => (
@@ -320,7 +320,7 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-2">
                       Pallets
                     </label>
                     <input
@@ -329,11 +329,11 @@ export default function AdminPage() {
                       onChange={(e) => setPallets(parseInt(e.target.value) || 0)}
                       min={0}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-2">
                       Loose Boxes (Optional)
                     </label>
                     <input
@@ -341,40 +341,40 @@ export default function AdminPage() {
                       value={boxes}
                       onChange={(e) => setBoxes(parseInt(e.target.value) || 0)}
                       min={0}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                   {selectedPart && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-700 font-medium">Calculation:</p>
-                      <p className="text-sm text-gray-600">
+                    <div className="bg-brand-rust-soft p-4 rounded-lg">
+                      <p className="text-sm text-brand-ink-soft font-medium">Calculation:</p>
+                      <p className="text-sm text-brand-ink-mute">
                         {pallets} pallets + {boxes} boxes
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-brand-ink-mute">
                         = {pallets * selectedPart.boxesPerPallet + boxes} total boxes
                       </p>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-brand-ink">
                         = {((pallets * selectedPart.boxesPerPallet + boxes) * selectedPart.unitsPerBox).toLocaleString()} units
                       </p>
                     </div>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-brand-ink-soft mb-2">
                     Notes (Optional)
                   </label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-4 py-2 border border-brand-rule rounded-lg"
                     placeholder="Production run notes..."
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-6 py-3 bg-brand-rust text-white font-semibold rounded-lg hover:bg-brand-rust-dark disabled:opacity-50"
                 >
                   {isSubmitting ? 'Adding...' : 'Add to Inventory'}
                 </button>
@@ -382,30 +382,30 @@ export default function AdminPage() {
             </div>
 
             {/* Production History */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Production History</h2>
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-brand-ink mb-6">Production History</h2>
               {isLoading ? (
-                <div className="text-center py-8 text-gray-600">Loading...</div>
+                <div className="text-center py-8 text-brand-ink-mute">Loading...</div>
               ) : productions.length === 0 ? (
-                <p className="text-center py-8 text-gray-600">No production runs yet</p>
+                <p className="text-center py-8 text-brand-ink-mute">No production runs yet</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                           Date
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                           Part
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                           Quantity
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                           Added By
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                           Notes
                         </th>
                       </tr>
@@ -413,21 +413,21 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-gray-200">
                       {productions.map((prod) => (
                         <tr key={prod.id}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
+                          <td className="px-4 py-3 text-sm text-brand-ink">
                             {new Date(prod.createdAt).toLocaleDateString()}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
+                          <td className="px-4 py-3 text-sm text-brand-ink">
                             <div>#{prod.part.partNumber}</div>
-                            <div className="text-xs text-gray-500">{prod.part.description}</div>
+                            <div className="text-xs text-brand-ink-mute">{prod.part.description}</div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
+                          <td className="px-4 py-3 text-sm text-brand-ink">
                             <div>{prod.pallets} pallets</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-brand-ink-mute">
                               {prod.totalUnits.toLocaleString()} units
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{prod.user.name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{prod.notes || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-brand-ink-mute">{prod.user.name}</td>
+                          <td className="px-4 py-3 text-sm text-brand-ink-mute">{prod.notes || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -441,37 +441,37 @@ export default function AdminPage() {
         {/* Billing & Reports Tab */}
         {activeTab === 'billing' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Release Report (All Time)</h2>
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-brand-ink mb-6">Release Report (All Time)</h2>
               {isLoading ? (
-                <div className="text-center py-8 text-gray-600">Loading...</div>
+                <div className="text-center py-8 text-brand-ink-mute">Loading...</div>
               ) : releases.length === 0 ? (
-                <p className="text-center py-8 text-gray-600">No releases yet</p>
+                <p className="text-center py-8 text-brand-ink-mute">No releases yet</p>
               ) : (
                 <>
                   <div className="overflow-x-auto mb-6">
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Date
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Release #
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Part
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Quantity
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Price/Unit
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-brand-ink-mute uppercase">
                             Total Value
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-brand-ink-mute uppercase">
                             Released By
                           </th>
                         </tr>
@@ -481,26 +481,26 @@ export default function AdminPage() {
                           const totalValue = release.totalUnits * parseFloat(release.part.pricePerUnit)
                           return (
                             <tr key={release.id}>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-brand-ink">
                                 {new Date(release.createdAt).toLocaleDateString()}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-brand-ink">
                                 {release.releaseNumber}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-brand-ink">
                                 <div>#{release.part.partNumber}</div>
-                                <div className="text-xs text-gray-500">{release.part.description}</div>
+                                <div className="text-xs text-brand-ink-mute">{release.part.description}</div>
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-brand-ink">
                                 {release.totalUnits.toLocaleString()} units
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-brand-ink">
                                 ${parseFloat(release.part.pricePerUnit).toFixed(4)}
                               </td>
-                              <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                              <td className="px-4 py-3 text-sm text-right font-semibold text-brand-ink">
                                 ${totalValue.toFixed(2)}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{release.user.name}</td>
+                              <td className="px-4 py-3 text-sm text-brand-ink-mute">{release.user.name}</td>
                             </tr>
                           )
                         })}
@@ -509,28 +509,28 @@ export default function AdminPage() {
                   </div>
 
                   {/* Summary */}
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary</h3>
+                  <div className="border-t border-brand-rule pt-6">
+                    <h3 className="text-lg font-semibold text-brand-ink mb-4">Summary</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Total Releases</p>
-                        <p className="text-2xl font-bold text-gray-900">{releases.length}</p>
+                        <p className="text-sm text-brand-ink-mute mb-1">Total Releases</p>
+                        <p className="text-2xl font-bold text-brand-ink">{releases.length}</p>
                       </div>
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Total Pallets</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-sm text-brand-ink-mute mb-1">Total Pallets</p>
+                        <p className="text-2xl font-bold text-brand-ink">
                           {releases.reduce((sum, r) => sum + r.pallets, 0)}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Total Units</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-sm text-brand-ink-mute mb-1">Total Units</p>
+                        <p className="text-2xl font-bold text-brand-ink">
                           {releases.reduce((sum, r) => sum + r.totalUnits, 0).toLocaleString()}
                         </p>
                       </div>
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm text-blue-900 mb-1 font-medium">Total Value</p>
-                        <p className="text-2xl font-bold text-blue-900">
+                      <div className="bg-brand-rust-soft p-4 rounded-lg">
+                        <p className="text-sm text-brand-ink mb-1 font-medium">Total Value</p>
+                        <p className="text-2xl font-bold text-brand-ink">
                           ${releases
                             .reduce(
                               (sum, r) => sum + r.totalUnits * parseFloat(r.part.pricePerUnit),
@@ -552,31 +552,31 @@ export default function AdminPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-brand-ink">
                   Edit Part #{editingPart.partNumber}
                 </h3>
                 <button
                   onClick={closeEditModal}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-brand-ink-mute"
                 >
                   ✕
                 </button>
               </div>
               <form onSubmit={handleSavePart} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                     Description
                   </label>
                   <input
                     type="text"
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                       Boxes per Pallet
                     </label>
                     <input
@@ -584,11 +584,11 @@ export default function AdminPage() {
                       value={editBoxesPerPallet}
                       onChange={(e) => setEditBoxesPerPallet(parseInt(e.target.value) || 0)}
                       min={1}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                       Units per Box
                     </label>
                     <input
@@ -596,25 +596,25 @@ export default function AdminPage() {
                       value={editUnitsPerBox}
                       onChange={(e) => setEditUnitsPerBox(parseInt(e.target.value) || 0)}
                       min={1}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                     Price per Unit ($)
                   </label>
                   <input
                     type="text"
                     value={editPricePerUnit}
                     onChange={(e) => setEditPricePerUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-brand-rule rounded-lg"
                     placeholder="0.0000"
                   />
                 </div>
-                <div className="bg-blue-50 p-3 rounded-lg text-sm">
-                  <p className="font-medium text-blue-900 mb-1">Units per Pallet Calculation:</p>
-                  <p className="text-blue-700">
+                <div className="bg-brand-rust-soft p-3 rounded-lg text-sm">
+                  <p className="font-medium text-brand-ink mb-1">Units per Pallet Calculation:</p>
+                  <p className="text-brand-rust-dark">
                     {editBoxesPerPallet} boxes × {editUnitsPerBox} units = {(editBoxesPerPallet * editUnitsPerBox).toLocaleString()} units/pallet
                   </p>
                 </div>
@@ -622,14 +622,14 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={closeEditModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    className="flex-1 px-4 py-2 border border-brand-rule text-brand-ink-soft rounded-lg hover:bg-brand-cream-deep"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isEditSubmitting}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-brand-rust text-white rounded-lg hover:bg-brand-rust-dark disabled:opacity-50"
                   >
                     {isEditSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
@@ -642,64 +642,64 @@ export default function AdminPage() {
         {/* Current Inventory Tab */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Current Inventory Levels</h2>
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-brand-ink mb-6">Current Inventory Levels</h2>
               {isLoading ? (
-                <div className="text-center py-8 text-gray-600">Loading...</div>
+                <div className="text-center py-8 text-brand-ink-mute">Loading...</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {parts.map((part) => (
-                    <div key={part.id} className="border-2 border-gray-200 rounded-lg p-6">
+                    <div key={part.id} className="border border-brand-rule rounded-lg p-6">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-lg font-bold text-gray-900">
+                        <h3 className="text-lg font-bold text-brand-ink">
                           Part #{part.partNumber}
                         </h3>
                         <button
                           onClick={() => openEditModal(part)}
-                          className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          className="px-3 py-1 text-sm bg-brand-rust-soft text-brand-rust-dark rounded hover:bg-brand-rust-soft"
                         >
                           Edit
                         </button>
                       </div>
-                      <p className="text-sm text-gray-600 mb-4">{part.description}</p>
+                      <p className="text-sm text-brand-ink-mute mb-4">{part.description}</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-50 p-4 rounded">
-                          <p className="text-sm text-gray-600 mb-1">Pallets</p>
-                          <p className="text-3xl font-bold text-gray-900">{part.currentPallets}</p>
+                          <p className="text-sm text-brand-ink-mute mb-1">Pallets</p>
+                          <p className="text-3xl font-bold text-brand-ink">{part.currentPallets}</p>
                         </div>
                         <div className="bg-gray-50 p-4 rounded">
-                          <p className="text-sm text-gray-600 mb-1">Boxes</p>
-                          <p className="text-3xl font-bold text-gray-900">{part.currentBoxes}</p>
+                          <p className="text-sm text-brand-ink-mute mb-1">Boxes</p>
+                          <p className="text-3xl font-bold text-brand-ink">{part.currentBoxes}</p>
                         </div>
                       </div>
-                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-1 text-sm">
+                      <div className="mt-4 pt-4 border-t border-brand-rule space-y-1 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Boxes per Pallet:</span>
+                          <span className="text-brand-ink-mute">Boxes per Pallet:</span>
                           <span className="font-semibold">{part.boxesPerPallet}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Units per Box:</span>
+                          <span className="text-brand-ink-mute">Units per Box:</span>
                           <span className="font-semibold">{part.unitsPerBox}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Total Boxes:</span>
+                          <span className="text-brand-ink-mute">Total Boxes:</span>
                           <span className="font-semibold">
                             {(part.currentPallets * part.boxesPerPallet + part.currentBoxes).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Total Units:</span>
+                          <span className="text-brand-ink-mute">Total Units:</span>
                           <span className="font-semibold">
                             {((part.currentPallets * part.boxesPerPallet + part.currentBoxes) * part.unitsPerBox).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Unit Price:</span>
+                          <span className="text-brand-ink-mute">Unit Price:</span>
                           <span className="font-semibold">${part.pricePerUnit}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t">
-                          <span className="text-gray-700 font-medium">Inventory Value:</span>
-                          <span className="font-bold text-blue-600">
+                          <span className="text-brand-ink-soft font-medium">Inventory Value:</span>
+                          <span className="font-bold text-brand-rust">
                             ${(
                               (part.currentPallets * part.boxesPerPallet + part.currentBoxes) *
                               part.unitsPerBox *

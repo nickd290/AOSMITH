@@ -20,6 +20,7 @@
     "bcryptjs": "^3.0.3",
     "canvas": "^3.2.0",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "jsbarcode": "^3.12.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",

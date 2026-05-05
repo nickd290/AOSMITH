@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Inventory Release Management - JD Graphic",
-  description: "Manage inventory releases for AO Smith",
+  title: "Inventory Release — JD Graphic",
+  description: "Inventory release management for Enterprise Print Group shipments out of JD Graphic.",
 };
 
 export default function RootLayout({

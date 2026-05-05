@@ -101,7 +101,10 @@ export async function PATCH(
       updateData.shipDate = body.shipDate ? new Date(body.shipDate) : null
     }
 
-    if (body.status !== undefined && ['COMPLETED', 'SHIPPED'].includes(body.status)) {
+    if (
+      body.status !== undefined &&
+      ['COMPLETED', 'READY_TO_SHIP', 'SHIPPED'].includes(body.status)
+    ) {
       updateData.status = body.status
     }
 

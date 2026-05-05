@@ -103,7 +103,7 @@ model Release {
   documentsGenerated  String?          // JSON: {"packingSlip": true, "boxLabels": true}
 
   // Shipping tracking
-  trackingNumber      String?          // FedEx/carrier tracking number
+  trackingNumber      String?          // Carrier tracking number
   shipDate            DateTime?        // Scheduled ship date (pickup date)
   etaDeliveryDate     DateTime?        // Estimated delivery date (5 business days from ship date)
 
@@ -120,6 +120,16 @@ model Release {
   // impactd122 integration
   impactJobId         String?          // ID of job created in impactd122
 
+  // Skid type — only per-release variable on the load (Apr 2026 EPG new process)
+  skidType            SkidType         @default(WOOD)
+
+  // Mark Shipped (Apr 2026 EPG new process — JD ships, captures PRO# after XPO phone booking)
+  proNumber           String?          // Carrier PRO #
+  carrier             String?          @default("XPO")
+  carrierAccountNumber String?         @default("JDGRCCTS900") // JD's XPO customer #
+  shippedAt           DateTime?
+  shippedByUserId     String?
+
   notes               String?
   status              ReleaseStatus    @default(COMPLETED)
   createdAt           DateTime         @default(now())
@@ -129,11 +139,19 @@ model Release {
   @@index([createdAt])
   @@index([releaseNumber])
   @@index([customerPONumber])
+  @@index([status])
+  @@index([proNumber])
 }
 
 enum ReleaseStatus {
   COMPLETED
+  READY_TO_SHIP
   SHIPPED
+}
+
+enum SkidType {
+  WOOD
+  HEAT_TREATED
 }
 
 // Production runs (admin adds inventory)
