@@ -8,8 +8,7 @@ import { generateJdShipmentPaperworkBuffer } from '@/lib/documents/jd-shipment-p
 import { sendReleaseNotification, sendThreeZReleaseNotification } from '@/lib/email/sendgrid'
 import { createImpactJob, isImpactd122Configured } from '@/lib/integrations/impactd122'
 import { createThreezPortalJob, isThreezPortalConfigured } from '@/lib/integrations/threez-portal'
-import { createJdInvoicingJob, isJdInvoicingConfigured } from '@/lib/integrations/jd-invoicing'
-import { createRmgtSchedulerJob, isRmgtSchedulerConfigured } from '@/lib/integrations/rmgt-scheduler'
+import { createPressPlannerJob, isPressPlannerConfigured } from '@/lib/integrations/press-planner'
 import {
   EPG_DEFAULT_CARRIER,
   EPG_DEFAULT_FREIGHT_TERMS,
@@ -505,40 +504,29 @@ export async function POST(request: NextRequest) {
       ? new Date(release.shipDate).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
 
-    // 6. Create job in JD Invoicing (for tracking + invoicing — no press needed)
-    if (isJdInvoicingConfigured()) {
-      createJdInvoicingJob({
-        client: 'EPG Enterprise Print Group',
-        description: `${release.part.partNumber} — ${release.part.description} | ${release.releaseNumber}`,
-        quantity: String(release.totalUnits),
-        poNumber: release.customerPONumber,
-        dueDate: shipDateStr,
-        pressType: 'digital-inkjet',
-        jobType: 'inventory-release',
-        notes: `INVENTORY RELEASE | ${release.releaseNumber} | Ticket: ${release.ticketNumber ?? 'N/A'} | Batch: ${release.batchNumber ?? 'N/A'} | Ship to: ${release.shippingLocation.name} via ${release.shipVia || EPG_DEFAULT_CARRIER}`,
+    // 6. Create job in jd-press-planner (single source of truth — fans out to
+    //    jd-invoicing Sheets via press-planner's Flow 1 fan-out; proofflow is
+    //    skipped because skipProofing=true. Status is flipped to 'complete'
+    //    after creation so this doesn't pollute the production schedule.
+    if (isPressPlannerConfigured()) {
+      createPressPlannerJob({
         releaseNumber: release.releaseNumber,
+        customerPONumber: release.customerPONumber,
+        partNumber: release.part.partNumber,
+        partDescription: release.part.description,
+        totalUnits: release.totalUnits,
+        pallets: release.pallets,
+        shipDateStr,
+        ticketNumber: release.ticketNumber,
+        batchNumber: release.batchNumber,
+        shippingLocationName: release.shippingLocation.name,
+        shippingLocationCity: release.shippingLocation.city,
+        shippingLocationState: release.shippingLocation.state,
+        shippingLocationAddress: release.shippingLocation.address,
+        shippingLocationZip: release.shippingLocation.zip,
+        shipVia: release.shipVia || EPG_DEFAULT_CARRIER,
       }).catch((err) =>
-        console.error('[jd-invoicing] Failed for release:', release.releaseNumber, err)
-      )
-    }
-
-    // 7. Create job in RMGT Scheduler (marked complete — no press time needed, just for visibility)
-    if (isRmgtSchedulerConfigured()) {
-      createRmgtSchedulerJob({
-        customer: 'EPG Enterprise Print Group',
-        customerCode: '2686',
-        projectName: `${release.part.partNumber} — ${release.part.description}`,
-        quantity: release.totalUnits,
-        category: 'OTHER',
-        product: 'inventory-release',
-        equipment: 'screen-1',
-        dueDate: shipDateStr,
-        purchaseOrder: release.customerPONumber,
-        productionNotes: `INVENTORY RELEASE | ${release.releaseNumber} | Ship to: ${release.shippingLocation.name}`,
-        source: 'inventory-release',
-        status: 'complete',
-      }).catch((err) =>
-        console.error('[rmgt-scheduler] Failed for release:', release.releaseNumber, err)
+        console.error('[press-planner] Failed for release:', release.releaseNumber, err)
       )
     }
 
