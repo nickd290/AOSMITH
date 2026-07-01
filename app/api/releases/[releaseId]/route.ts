@@ -54,7 +54,7 @@ export async function GET(
   }
 }
 
-// PATCH - Update release (tracking number, ship date, status)
+// PATCH - Update release (tracking number, ship date, status, skid count)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ releaseId: string }> }
@@ -92,6 +92,8 @@ export async function PATCH(
 
     // Build update data - only allow specific fields to be updated
     const updateData: Record<string, unknown> = {}
+    let palletDelta = 0
+    let newPallets: number | undefined
 
     if (body.trackingNumber !== undefined) {
       updateData.trackingNumber = body.trackingNumber
@@ -113,23 +115,87 @@ export async function PATCH(
       updateData.status = 'SHIPPED'
     }
 
-    const release = await prisma.release.update({
-      where: { id: releaseId },
-      data: updateData,
-      include: {
-        part: true,
-        shippingLocation: true,
-        user: {
-          select: {
-            name: true,
-            email: true,
+    if (body.pallets !== undefined) {
+      if (existingRelease.status === 'SHIPPED') {
+        return NextResponse.json(
+          { error: 'Cannot change skid count on a shipped release' },
+          { status: 400 }
+        )
+      }
+
+      const parsedPallets = Number(body.pallets)
+      if (!Number.isInteger(parsedPallets) || parsedPallets < 1) {
+        return NextResponse.json(
+          { error: 'Skid count must be a whole number of at least 1' },
+          { status: 400 }
+        )
+      }
+
+      if (parsedPallets !== existingRelease.pallets) {
+        palletDelta = parsedPallets - existingRelease.pallets
+        newPallets = parsedPallets
+      }
+    }
+
+    const release = await prisma.$transaction(async (tx) => {
+      if (palletDelta !== 0 && newPallets !== undefined) {
+        const part = await tx.part.findUnique({
+          where: { id: existingRelease.partId },
+        })
+
+        if (!part) {
+          throw new Error('Part not found')
+        }
+
+        if (palletDelta > 0 && part.currentPallets < palletDelta) {
+          throw new Error('INSUFFICIENT_INVENTORY')
+        }
+
+        const totalBoxesReleased =
+          newPallets * part.boxesPerPallet + existingRelease.boxes
+
+        updateData.pallets = newPallets
+        updateData.totalUnits = totalBoxesReleased * part.unitsPerBox
+        updateData.cartons = totalBoxesReleased
+
+        await tx.part.update({
+          where: { id: part.id },
+          data: {
+            currentPallets: { increment: -palletDelta },
+          },
+        })
+      }
+
+      return tx.release.update({
+        where: { id: releaseId },
+        data: updateData,
+        include: {
+          part: true,
+          shippingLocation: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      })
     })
+
+    if (palletDelta !== 0) {
+      console.log(
+        `📦 Release ${existingRelease.releaseNumber} skid count updated: ${existingRelease.pallets} → ${newPallets} (inventory ${palletDelta > 0 ? '-' : '+'}${Math.abs(palletDelta)} pallets)`
+      )
+    }
 
     return NextResponse.json({ release })
   } catch (error) {
+    if (error instanceof Error && error.message === 'INSUFFICIENT_INVENTORY') {
+      return NextResponse.json(
+        { error: 'Insufficient inventory to increase skid count' },
+        { status: 400 }
+      )
+    }
     console.error('Error updating release:', error)
     return NextResponse.json({ error: 'An error occurred' }, { status: 500 })
   }

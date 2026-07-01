@@ -81,6 +81,7 @@ function HistoryPageInner() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [trackingNumber, setTrackingNumber] = useState('')
   const [shipDate, setShipDate] = useState('')
+  const [editPallets, setEditPallets] = useState(1)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -121,6 +122,7 @@ function HistoryPageInner() {
     if (selectedRelease) {
       setTrackingNumber(selectedRelease.trackingNumber || '')
       setShipDate(selectedRelease.shipDate ? selectedRelease.shipDate.split('T')[0] : '')
+      setEditPallets(selectedRelease.pallets)
       setProNumberInput(selectedRelease.proNumber || '')
       setCarrierInput(selectedRelease.carrier || 'XPO')
       setShipDateInput(new Date().toISOString().split('T')[0])
@@ -222,11 +224,13 @@ function HistoryPageInner() {
         body: JSON.stringify({
           trackingNumber: trackingNumber || null,
           shipDate: shipDate || null,
+          pallets: editPallets,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update release')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update release')
       }
 
       const data = await response.json()
@@ -238,7 +242,7 @@ function HistoryPageInner() {
       alert('Release updated successfully!')
     } catch (err) {
       console.error('Error updating release:', err)
-      alert('Failed to update release. Please try again.')
+      alert(err instanceof Error ? err.message : 'Failed to update release. Please try again.')
     } finally {
       setIsUpdating(false)
     }
@@ -666,17 +670,59 @@ function HistoryPageInner() {
               </div>
 
               {/* Quantity */}
-              <div className="mb-6 grid grid-cols-2 gap-4">
-                <div className="p-4 bg-brand-rust-soft rounded-lg">
-                  <p className="text-sm text-brand-rust">Pallets</p>
-                  <p className="text-2xl font-bold text-brand-ink">{selectedRelease.pallets}</p>
-                </div>
-                <div className="p-4 bg-brand-rust-soft rounded-lg">
-                  <p className="text-sm text-brand-rust">Total Units</p>
-                  <p className="text-2xl font-bold text-brand-ink">
-                    {selectedRelease.totalUnits.toLocaleString()}
-                  </p>
-                </div>
+              <div className="mb-6 p-4 bg-brand-rust-soft rounded-lg border border-brand-rust/20">
+                <h3 className="font-semibold text-brand-ink mb-3">Release Quantity</h3>
+                {selectedRelease.status === 'SHIPPED' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-brand-rust">Skids</p>
+                      <p className="text-2xl font-bold text-brand-ink">{selectedRelease.pallets}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-brand-rust">Total Units</p>
+                      <p className="text-2xl font-bold text-brand-ink">
+                        {selectedRelease.totalUnits.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-brand-ink-soft mb-1">
+                        Skids to Release
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={editPallets}
+                        onChange={(e) => setEditPallets(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-full px-3 py-2 border border-brand-rule rounded-lg"
+                      />
+                      <p className="text-xs text-brand-ink-mute mt-1">
+                        = {editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes} boxes
+                        {' • '}
+                        {(
+                          (editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes) *
+                          selectedRelease.part.unitsPerBox
+                        ).toLocaleString()}{' '}
+                        units
+                      </p>
+                      {editPallets !== selectedRelease.pallets && (
+                        <p className="text-xs text-amber-700 mt-1">
+                          Changing from {selectedRelease.pallets} to {editPallets} skid
+                          {editPallets === 1 ? '' : 's'}. Regenerate documents after saving.
+                        </p>
+                      )}
+                    </div>
+                    <div className="pt-1 border-t border-brand-rust/20">
+                      <p className="text-sm text-brand-rust">Current Total Units</p>
+                      <p className="text-xl font-bold text-brand-ink">
+                        {selectedRelease.totalUnits.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Shipping Info */}
@@ -757,7 +803,7 @@ function HistoryPageInner() {
                     disabled={isUpdating}
                     className="w-full px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isUpdating ? 'Updating...' : 'Update Shipping Info'}
+                    {isUpdating ? 'Updating...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
