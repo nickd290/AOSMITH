@@ -86,6 +86,8 @@ export default function ReleasePage() {
 
   // Release result
   const [release, setRelease] = useState<Release | null>(null)
+  const [editPallets, setEditPallets] = useState(5)
+  const [isUpdatingSkids, setIsUpdatingSkids] = useState(false)
 
   // Document generation state
   const [isGeneratingDocs, setIsGeneratingDocs] = useState(false)
@@ -167,11 +169,45 @@ export default function ReleasePage() {
 
       const data = await response.json()
       setRelease(data.release)
+      setEditPallets(data.release.pallets)
       setStep(3)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create release')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const updateSkids = async () => {
+    if (!release) return
+
+    setIsUpdatingSkids(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/releases/${release.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pallets: editPallets }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update skid count')
+      }
+
+      const data = await response.json()
+      setRelease(data.release)
+      setEditPallets(data.release.pallets)
+      setPackingSlipUrl(null)
+      setBoxLabelsUrl(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update skid count')
+    } finally {
+      setIsUpdatingSkids(false)
     }
   }
 
@@ -570,15 +606,35 @@ export default function ReleasePage() {
                       #{release.part.partNumber} - {release.part.description}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-brand-ink-mute">Quantity:</span>
-                    <span className="font-semibold">
-                      {release.pallets} pallets ({release.pallets * release.part.boxesPerPallet}{' '}
-                      boxes)
-                    </span>
+                  <div className="pt-2 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
+                      Skids to Release
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editPallets}
+                      onChange={(e) =>
+                        setEditPallets(Math.max(1, parseInt(e.target.value, 10) || 1))
+                      }
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
+                    />
+                    <p className="text-xs text-brand-ink-mute mt-1">
+                      = {editPallets * release.part.boxesPerPallet} boxes •{' '}
+                      {(editPallets * release.part.boxesPerPallet * release.part.unitsPerBox).toLocaleString()}{' '}
+                      units
+                    </p>
+                    <button
+                      onClick={updateSkids}
+                      disabled={isUpdatingSkids || editPallets === release.pallets}
+                      className="w-full mt-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUpdatingSkids ? 'Updating...' : 'Update Skids'}
+                    </button>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-brand-ink-mute">Total Units:</span>
+                    <span className="text-brand-ink-mute">Current Total Units:</span>
                     <span className="font-semibold">{release.totalUnits.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">

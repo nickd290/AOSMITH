@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, CheckCircle2, ExternalLink } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, CheckCircle2, ExternalLink, Pencil } from 'lucide-react'
 
 interface Release {
   id: string
@@ -79,6 +79,7 @@ function HistoryPageInner() {
   // Sidebar state
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isUpdatingSkids, setIsUpdatingSkids] = useState(false)
   const [trackingNumber, setTrackingNumber] = useState('')
   const [shipDate, setShipDate] = useState('')
   const [editPallets, setEditPallets] = useState(1)
@@ -210,10 +211,13 @@ function HistoryPageInner() {
     }
   }
 
-  const updateRelease = async () => {
+  const applyReleaseUpdate = async (
+    payload: Record<string, unknown>,
+    setLoading: (value: boolean) => void
+  ) => {
     if (!selectedRelease) return
 
-    setIsUpdating(true)
+    setLoading(true)
     try {
       const response = await fetch(`/api/releases/${selectedRelease.id}`, {
         method: 'PATCH',
@@ -221,11 +225,7 @@ function HistoryPageInner() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          trackingNumber: trackingNumber || null,
-          shipDate: shipDate || null,
-          pallets: editPallets,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -244,9 +244,21 @@ function HistoryPageInner() {
       console.error('Error updating release:', err)
       alert(err instanceof Error ? err.message : 'Failed to update release. Please try again.')
     } finally {
-      setIsUpdating(false)
+      setLoading(false)
     }
   }
+
+  const updateSkids = () =>
+    applyReleaseUpdate({ pallets: editPallets }, setIsUpdatingSkids)
+
+  const updateRelease = () =>
+    applyReleaseUpdate(
+      {
+        trackingNumber: trackingNumber || null,
+        shipDate: shipDate || null,
+      },
+      setIsUpdating
+    )
 
   const downloadDocument = async (releaseId: string, docType: 'packing-slip' | 'box-labels' | 'invoice') => {
     setDownloadingDoc(`${releaseId}-${docType}`)
@@ -394,7 +406,9 @@ function HistoryPageInner() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-brand-ink">Release History</h1>
-            <p className="text-sm text-brand-ink-mute mt-1">Click on a release to view details and update shipping info</p>
+            <p className="text-sm text-brand-ink-mute mt-1">
+              Click a release to open the detail panel — edit skid count, shipping info, and documents
+            </p>
           </div>
           <div className="flex items-center gap-4">
             {user?.role === 'ADMIN' && (
@@ -553,10 +567,16 @@ function HistoryPageInner() {
                           <div className="text-xs text-brand-ink-mute">{release.part.description}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
-                          <div>{release.pallets} pallets</div>
+                          <div>{release.pallets} skid{release.pallets === 1 ? '' : 's'}</div>
                           <div className="text-xs text-brand-ink-mute">
                             {release.totalUnits.toLocaleString()} units
                           </div>
+                          {release.status !== 'SHIPPED' && (
+                            <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-rust">
+                              <Pencil className="w-3 h-3" />
+                              Edit skids
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-brand-ink-mute">
                           <div>{release.shippingLocation.name}</div>
@@ -714,6 +734,13 @@ function HistoryPageInner() {
                           {editPallets === 1 ? '' : 's'}. Regenerate documents after saving.
                         </p>
                       )}
+                      <button
+                        onClick={updateSkids}
+                        disabled={isUpdatingSkids || editPallets === selectedRelease.pallets}
+                        className="w-full mt-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUpdatingSkids ? 'Updating...' : 'Update Skids'}
+                      </button>
                     </div>
                     <div className="pt-1 border-t border-brand-rust/20">
                       <p className="text-sm text-brand-rust">Current Total Units</p>
@@ -803,7 +830,7 @@ function HistoryPageInner() {
                     disabled={isUpdating}
                     className="w-full px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isUpdating ? 'Updating...' : 'Save Changes'}
+                    {isUpdating ? 'Updating...' : 'Update Shipping Info'}
                   </button>
                 </div>
               </div>
