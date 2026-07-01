@@ -202,8 +202,16 @@ export default function ReleasePage() {
       const data = await response.json()
       setRelease(data.release)
       setEditPallets(data.release.pallets)
-      setPackingSlipUrl(null)
-      setBoxLabelsUrl(null)
+      if (data.release.packingSlipUrl) {
+        setPackingSlipUrl(data.release.packingSlipUrl)
+      } else {
+        setPackingSlipUrl(null)
+      }
+      if (data.release.boxLabelsUrl) {
+        setBoxLabelsUrl(data.release.boxLabelsUrl)
+      } else {
+        setBoxLabelsUrl(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update skid count')
     } finally {

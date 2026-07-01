@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
+import { weightForPalletCount } from '@/lib/documents/release-document-data'
+import { regenerateStoredReleaseDocuments } from '@/lib/documents/regenerate-stored-documents'
 
 // GET single release by ID
 export async function GET(
@@ -130,7 +132,7 @@ export async function PATCH(
       }
     }
 
-    const release = await prisma.$transaction(async (tx) => {
+    let release = await prisma.$transaction(async (tx) => {
       if (palletDelta !== 0 && newPallets !== undefined) {
         const part = await tx.part.findUnique({
           where: { id: existingRelease.partId },
@@ -150,6 +152,7 @@ export async function PATCH(
         updateData.pallets = newPallets
         updateData.totalUnits = totalBoxesReleased * part.unitsPerBox
         updateData.cartons = totalBoxesReleased
+        updateData.weight = weightForPalletCount(newPallets)
 
         await tx.part.update({
           where: { id: part.id },
@@ -175,13 +178,41 @@ export async function PATCH(
       })
     })
 
+    let documentsRegenerated = false
+
     if (palletDelta !== 0) {
       console.log(
         `📦 Release ${existingRelease.releaseNumber} skid count updated: ${existingRelease.pallets} → ${newPallets} (inventory ${palletDelta > 0 ? '-' : '+'}${Math.abs(palletDelta)} pallets)`
       )
+
+      const regen = await regenerateStoredReleaseDocuments(releaseId, release)
+      if (regen.packingSlipUrl || regen.boxLabelsUrl) {
+        release = await prisma.release.update({
+          where: { id: releaseId },
+          data: {
+            ...(regen.packingSlipUrl ? { packingSlipUrl: regen.packingSlipUrl } : {}),
+            ...(regen.boxLabelsUrl ? { boxLabelsUrl: regen.boxLabelsUrl } : {}),
+            documentsGenerated: new Date().toISOString(),
+          },
+          include: {
+            part: true,
+            shippingLocation: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+        })
+        documentsRegenerated = true
+        console.log(
+          `📄 Documents regenerated for ${release.releaseNumber} (${newPallets} skids)`,
+        )
+      }
     }
 
-    return NextResponse.json({ release })
+    return NextResponse.json({ release, documentsRegenerated })
   } catch (error) {
     if (error instanceof Error && error.message === 'INSUFFICIENT_INVENTORY') {
       return NextResponse.json(

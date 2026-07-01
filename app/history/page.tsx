@@ -238,8 +238,18 @@ function HistoryPageInner() {
       // Update the release in the list
       setReleases(releases.map(r => r.id === data.release.id ? data.release : r))
       setSelectedRelease(data.release)
+      setEditPallets(data.release.pallets)
 
-      alert('Release updated successfully!')
+      if (data.documentsRegenerated) {
+        alert(
+          `Skids updated to ${data.release.pallets}. Packing slip, box labels, and JD paperwork now reflect the new quantity — open JD Paperwork to print.`
+        )
+        if (user?.role === 'ADMIN') {
+          openJdPaperwork(data.release.id)
+        }
+      } else {
+        alert('Release updated successfully!')
+      }
     } catch (err) {
       console.error('Error updating release:', err)
       alert(err instanceof Error ? err.message : 'Failed to update release. Please try again.')
@@ -370,7 +380,7 @@ function HistoryPageInner() {
 
   const openJdPaperwork = (releaseId: string) => {
     if (!token) return
-    const url = `/api/releases/${releaseId}/jd-paperwork?token=${encodeURIComponent(token)}`
+    const url = `/api/releases/${releaseId}/jd-paperwork?token=${encodeURIComponent(token)}&t=${Date.now()}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -695,8 +705,8 @@ function HistoryPageInner() {
               <div className="mb-6 p-4 bg-brand-rust-soft rounded-lg border border-brand-rust/20">
                 <h3 className="font-semibold text-brand-ink mb-1">Release Quantity</h3>
                 <p className="text-xs text-brand-ink-mute mb-3">
-                  Splitting across days? Reduce skids on this release before the first truck goes out,
-                  then create another release tomorrow for the rest.
+                  Splitting across days? Reduce skids here before the truck goes out — packing slip,
+                  BOL, and pallet flags regenerate automatically when you click Update Skids.
                 </p>
                 <div className="space-y-3">
                   <div>
@@ -726,7 +736,8 @@ function HistoryPageInner() {
                         {editPallets === 1 ? '' : 's'}.
                         {editPallets < selectedRelease.pallets
                           ? ' Freed skids return to available inventory.'
-                          : ' Regenerate documents after saving.'}
+                          : ''}{' '}
+                        Paperwork refreshes when you click Update Skids.
                       </p>
                     )}
                     <button
