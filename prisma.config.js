@@ -1,4 +1,5 @@
-require('dotenv').config({ override: true })
+// Do not override injected env (e.g. Railway DATABASE_URL during db push / deploy).
+require('dotenv').config({ override: !process.env.DATABASE_URL })
 
 const { defineConfig } = require('prisma/config')
 
