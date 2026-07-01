@@ -14,6 +14,7 @@ import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
 import { sendShipConfirmationEmail } from '@/lib/email/sendgrid'
 import { EPG_DEFAULT_CARRIER } from '@/lib/epg'
+import { ensureDefaultShipment, syncReleaseStatusFromShipments } from '@/lib/shipments/helpers'
 
 export async function POST(
   request: NextRequest,
@@ -56,20 +57,43 @@ export async function POST(
 
     const shippedAt = shipDate ? new Date(shipDate) : new Date()
     const finalCarrier = (carrier && carrier.trim()) || existing.carrier || EPG_DEFAULT_CARRIER
+    const trimmedPro = proNumber.trim()
 
-    const updated = await prisma.release.update({
-      where: { id: releaseId },
+    await ensureDefaultShipment(existing)
+
+    const pendingShipments = await prisma.releaseShipment.findMany({
+      where: { releaseId, status: 'PENDING' },
+    })
+    if (pendingShipments.length === 0) {
+      return NextResponse.json(
+        { error: 'All shipments on this release are already marked shipped' },
+        { status: 400 },
+      )
+    }
+
+    await prisma.releaseShipment.updateMany({
+      where: { releaseId, status: 'PENDING' },
       data: {
-        proNumber: proNumber.trim(),
+        status: 'SHIPPED',
+        proNumber: trimmedPro,
         carrier: finalCarrier,
         shippedAt,
-        shippedByUserId: user.id,
-        status: 'SHIPPED',
-        // Mirror PRO into trackingNumber for legacy UI bits that read it.
-        trackingNumber: proNumber.trim(),
-        shipDate: existing.shipDate ?? shippedAt,
       },
-      include: { part: true, shippingLocation: true },
+    })
+
+    await syncReleaseStatusFromShipments(releaseId)
+
+    const updated = await prisma.release.findUnique({
+      where: { id: releaseId },
+      include: { part: true, shippingLocation: true, shipments: { orderBy: { shipmentNumber: 'asc' } } },
+    })
+    if (!updated) {
+      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
+    }
+
+    await prisma.release.update({
+      where: { id: releaseId },
+      data: { shippedByUserId: user.id },
     })
 
     // Fire confirmation email — non-blocking on failure (release is already shipped).

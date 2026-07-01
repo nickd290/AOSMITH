@@ -233,7 +233,19 @@ function HistoryPageInner() {
       .reduce((sum, s) => sum + s.pallets, 0)
     const remaining = selectedRelease.pallets - shippedPallets
     if (remaining <= 0) {
-      alert('All skids on this release have already shipped.')
+      const shippedShipment = shipments.find((s) => s.status === 'SHIPPED')
+      if (user?.role === 'ADMIN' && shippedShipment) {
+        const reopen = confirm(
+          `All ${selectedRelease.pallets} skid${selectedRelease.pallets === 1 ? '' : 's'} show as already shipped.\n\nReopen Shipment ${shippedShipment.shipmentNumber} first so you can split across trucks?`,
+        )
+        if (reopen) {
+          void reopenShippedRelease()
+        }
+      } else {
+        alert(
+          'All skids on this release have already shipped. An admin must use Mark Not Shipped on a shipment line first.',
+        )
+      }
       return
     }
     if (remaining === 1) {
@@ -339,6 +351,15 @@ function HistoryPageInner() {
     } finally {
       setUnmarkingShipmentId(null)
     }
+  }
+
+  const reopenShippedRelease = async () => {
+    const shippedShipment = shipments.find((s) => s.status === 'SHIPPED')
+    if (!shippedShipment) {
+      alert('No shipped truck line to reopen.')
+      return
+    }
+    await unmarkShipmentShipped(shippedShipment)
   }
 
   const markShipmentShipped = async (shipmentId: string) => {
@@ -1119,6 +1140,17 @@ function HistoryPageInner() {
                             : ''}
                         </div>
                       </div>
+                      {shipments.some((s) => s.status === 'SHIPPED') && (
+                        <button
+                          onClick={() => void reopenShippedRelease()}
+                          disabled={unmarkingShipmentId !== null}
+                          className="w-full px-3 py-2 border border-amber-300 bg-amber-50 text-amber-900 text-sm font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {unmarkingShipmentId
+                            ? 'Reopening…'
+                            : 'Reopen Release (split across trucks)'}
+                        </button>
+                      )}
                     </div>
                   ) : showMarkShippedForm ? (
                     <div className="space-y-3">
