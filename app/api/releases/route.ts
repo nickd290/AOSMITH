@@ -15,6 +15,7 @@ import {
   EPG_SHIP_TO,
   JD_SHIP_FROM,
 } from '@/lib/epg'
+import { shipmentTotals } from '@/lib/shipments/helpers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -151,6 +152,27 @@ export async function POST(request: NextRequest) {
         part: true,
         shippingLocation: true,
         user: true,
+      },
+    })
+
+    // One default shipment line matching the full EPG release (splittable later)
+    const initialShipmentTotals = shipmentTotals(
+      requestedPallets,
+      requestedBoxes,
+      part,
+    )
+    await prisma.releaseShipment.create({
+      data: {
+        releaseId: release.id,
+        shipmentNumber: 1,
+        pallets: requestedPallets,
+        boxes: requestedBoxes,
+        totalUnits: initialShipmentTotals.totalUnits,
+        cartons: initialShipmentTotals.cartons,
+        weight: initialShipmentTotals.weight,
+        status: 'PENDING',
+        carrier: release.shipVia || EPG_DEFAULT_CARRIER,
+        shipDate: release.shipDate,
       },
     })
 
@@ -573,6 +595,7 @@ export async function GET(request: NextRequest) {
       include: {
         part: true,
         shippingLocation: true,
+        shipments: { orderBy: { shipmentNumber: 'asc' } },
         user: {
           select: {
             name: true,

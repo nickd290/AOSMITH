@@ -134,6 +134,8 @@ model Release {
   status              ReleaseStatus    @default(COMPLETED)
   createdAt           DateTime         @default(now())
 
+  shipments           ReleaseShipment[]
+
   @@index([partId])
   @@index([userId])
   @@index([createdAt])
@@ -146,6 +148,36 @@ model Release {
 enum ReleaseStatus {
   COMPLETED
   READY_TO_SHIP
+  PARTIALLY_SHIPPED
+  SHIPPED
+}
+
+// Physical truck loads within an EPG release (e.g. 5 skids split as 2 + 3)
+model ReleaseShipment {
+  id             String                 @id @default(cuid())
+  releaseId      String
+  release        Release                @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  shipmentNumber Int
+  pallets        Int
+  boxes          Int                    @default(0)
+  totalUnits     Int
+  cartons        Int?
+  weight         Float?
+  status         ReleaseShipmentStatus  @default(PENDING)
+  proNumber      String?
+  carrier        String?                @default("XPO")
+  shippedAt      DateTime?
+  shipDate       DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([releaseId, shipmentNumber])
+  @@index([releaseId])
+  @@index([status])
+}
+
+enum ReleaseShipmentStatus {
+  PENDING
   SHIPPED
 }
 

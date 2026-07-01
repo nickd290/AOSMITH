@@ -1,28 +1,20 @@
 /**
  * GET /api/releases/[releaseId]/jd-paperwork
  *
- * Returns a single PDF: JD packing slip + BOL + one pallet flag per skid.
- * Admin-only.
- *
- * Per Apr 2026 EPG new process: JD ships EPG releases on JD's own paperwork
- * (XPO on JD account JDGRCCTS900, manual phone booking). The shipping party
- * prints this PDF and attaches it to the skids before pickup.
+ * Returns JD packing slip + BOL + one pallet flag per skid.
+ * Optional ?shipmentId= for split-shipment paperwork (subset of EPG release).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromToken } from '@/lib/auth'
 import { generateJdShipmentPaperwork } from '@/lib/documents/jd-shipment-paperwork'
+import { appendLoadFlagsPages } from '@/lib/documents/load-flags'
+import { ensureDefaultShipment } from '@/lib/shipments/helpers'
 import {
-  appendLoadFlagsPages,
-  type LoadFlagSkid,
-} from '@/lib/documents/load-flags'
-import {
-  EPG_DEFAULT_CARRIER,
-  EPG_DEFAULT_CARRIER_ACCOUNT,
-  EPG_DEFAULT_FREIGHT_TERMS,
-  EPG_DEFAULT_LBS_PER_PALLET,
-} from '@/lib/epg'
+  buildLoadFlagsForShipment,
+  buildShipmentPaperworkContext,
+} from '@/lib/shipments/paperwork'
 
 export async function GET(
   request: NextRequest,
@@ -50,6 +42,7 @@ export async function GET(
     }
 
     const { releaseId } = await params
+    const shipmentId = request.nextUrl.searchParams.get('shipmentId')
 
     const release = await prisma.release.findUnique({
       where: { id: releaseId },
@@ -60,87 +53,42 @@ export async function GET(
       return NextResponse.json({ error: 'Release not found' }, { status: 404 })
     }
 
-    const cartons =
-      release.cartons ?? release.pallets * release.part.boxesPerPallet + release.boxes
-    const carrier = release.carrier || EPG_DEFAULT_CARRIER
-    const carrierAccountNumber =
-      release.carrierAccountNumber || EPG_DEFAULT_CARRIER_ACCOUNT
-    const totalWeight =
-      release.weight && release.weight > 0
-        ? release.weight
-        : Math.max(1, release.pallets) * EPG_DEFAULT_LBS_PER_PALLET
-    const shippingClass = release.shippingClass || '55'
-    const freightTerms = release.freightTerms || EPG_DEFAULT_FREIGHT_TERMS
+    const allShipments = await ensureDefaultShipment(release)
+    const shipment =
+      (shipmentId
+        ? allShipments.find((s) => s.id === shipmentId)
+        : allShipments.find((s) => s.status === 'PENDING')) ?? allShipments[0]
 
-    const doc = generateJdShipmentPaperwork({
-      releaseNumber: release.releaseNumber,
-      ticketNumber: release.ticketNumber || 'N/A',
-      customerPONumber: release.customerPONumber,
-      date: release.createdAt,
-      shipDate: release.shipDate ?? null,
-      carrier,
-      carrierAccountNumber,
-      freightTerms,
-      pallets: release.pallets,
-      cartons,
-      weight: totalWeight,
-      shippingClass,
-      skidType: release.skidType,
-      notes: release.notes,
-      lineItems: [
-        {
-          partNumber: release.part.partNumber,
-          description: release.part.description,
-          unitsPerBox: release.part.unitsPerBox,
-          ordered: release.totalUnits,
-          shipped: release.totalUnits,
-        },
-      ],
-    })
+    if (!shipment) {
+      return NextResponse.json({ error: 'Shipment not found' }, { status: 404 })
+    }
 
-    // Append one pallet flag page per skid (even-split units/cartons/weight,
-    // remainder on the last skid).
-    const palletCount = Math.max(1, release.pallets)
-    const baseUnits = Math.floor(release.totalUnits / palletCount)
-    const baseCartons = Math.floor(cartons / palletCount)
-    const baseWeight = Math.round((totalWeight / palletCount) * 100) / 100
-    const skids: LoadFlagSkid[] = Array.from({ length: palletCount }, (_, i) => {
-      const skidNumber = i + 1
-      const isLast = skidNumber === palletCount
-      return {
-        skidNumber,
-        partNumber: release.part.partNumber,
-        description: release.part.description,
-        unitsPerBox: release.part.unitsPerBox,
-        units: isLast
-          ? release.totalUnits - baseUnits * (palletCount - 1)
-          : baseUnits,
-        cartons: isLast ? cartons - baseCartons * (palletCount - 1) : baseCartons,
-        weight: isLast
-          ? Math.round((totalWeight - baseWeight * (palletCount - 1)) * 100) / 100
-          : baseWeight,
-      }
-    })
+    const paperwork = buildShipmentPaperworkContext(release, shipment, allShipments)
+    const doc = generateJdShipmentPaperwork(paperwork)
+
+    const flags = buildLoadFlagsForShipment(release, shipment, allShipments)
     appendLoadFlagsPages(doc, {
       releaseNumber: release.releaseNumber,
       date: release.createdAt,
-      carrier,
-      customerPONumber: release.customerPONumber,
-      totalSkids: palletCount,
-      totalWeight,
-      shippingClass,
-      skidType: release.skidType,
-      batchNumber: release.batchNumber ?? undefined,
-      skids,
+      carrier: flags.carrier,
+      customerPONumber: flags.customerPONumber,
+      totalSkids: flags.totalSkids,
+      totalWeight: flags.totalWeight,
+      shippingClass: flags.shippingClass,
+      skidType: flags.skidType,
+      batchNumber: flags.batchNumber,
+      skids: flags.skids,
     })
 
     const pdf = Buffer.from(doc.output('arraybuffer'))
+    const suffix =
+      allShipments.length > 1 ? `-shipment-${shipment.shipmentNumber}` : ''
 
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="JD-${release.releaseNumber}-paperwork.pdf"`,
+        'Content-Disposition': `inline; filename="JD-${release.releaseNumber}${suffix}-paperwork.pdf"`,
         'Cache-Control': 'no-store',
       },
     })

@@ -4,7 +4,19 @@ import { Suspense, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, CheckCircle2, ExternalLink, Pencil } from 'lucide-react'
+import { FileText, Tag, Package, X, Truck, Calendar, Receipt, Download, Loader2, Trash2, CheckCircle2, ExternalLink, Pencil, Split, Plus } from 'lucide-react'
+
+interface ReleaseShipment {
+  id: string
+  shipmentNumber: number
+  pallets: number
+  boxes: number
+  totalUnits: number
+  status: string
+  proNumber?: string | null
+  carrier?: string | null
+  shippedAt?: string | null
+}
 
 interface Release {
   id: string
@@ -51,6 +63,7 @@ interface Release {
     name: string
     email: string
   }
+  shipments?: ReleaseShipment[]
 }
 
 export default function HistoryPage() {
@@ -79,10 +92,14 @@ function HistoryPageInner() {
   // Sidebar state
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [isUpdatingSkids, setIsUpdatingSkids] = useState(false)
   const [trackingNumber, setTrackingNumber] = useState('')
   const [shipDate, setShipDate] = useState('')
-  const [editPallets, setEditPallets] = useState(1)
+  const [shipments, setShipments] = useState<ReleaseShipment[]>([])
+  const [showSplitModal, setShowSplitModal] = useState(false)
+  const [splitRows, setSplitRows] = useState<number[]>([2, 3])
+  const [isSplitting, setIsSplitting] = useState(false)
+  const [markingShipmentId, setMarkingShipmentId] = useState<string | null>(null)
+  const [shipmentProInputs, setShipmentProInputs] = useState<Record<string, string>>({})
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -123,7 +140,7 @@ function HistoryPageInner() {
     if (selectedRelease) {
       setTrackingNumber(selectedRelease.trackingNumber || '')
       setShipDate(selectedRelease.shipDate ? selectedRelease.shipDate.split('T')[0] : '')
-      setEditPallets(selectedRelease.pallets)
+      fetchShipments(selectedRelease.id)
       setProNumberInput(selectedRelease.proNumber || '')
       setCarrierInput(selectedRelease.carrier || 'XPO')
       setShipDateInput(new Date().toISOString().split('T')[0])
@@ -189,6 +206,137 @@ function HistoryPageInner() {
     setFilteredReleases(filtered)
   }
 
+  const fetchShipments = async (releaseId: string) => {
+    try {
+      const response = await fetch(`/api/releases/${releaseId}/shipments`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      setShipments(data.shipments || [])
+      const pending = data.remainingPallets ?? 0
+      if (pending > 0 && data.originalPallets > 1) {
+        setSplitRows([Math.min(2, pending), Math.max(0, pending - Math.min(2, pending))].filter((n) => n > 0))
+      } else if (data.originalPallets) {
+        setSplitRows([data.originalPallets])
+      }
+    } catch (err) {
+      console.error('Error fetching shipments:', err)
+    }
+  }
+
+  const openSplitModal = () => {
+    if (!selectedRelease) return
+    const shippedPallets = shipments
+      .filter((s) => s.status === 'SHIPPED')
+      .reduce((sum, s) => sum + s.pallets, 0)
+    const remaining = selectedRelease.pallets - shippedPallets
+    if (remaining <= 0) {
+      alert('All skids on this release have already shipped.')
+      return
+    }
+    if (remaining === 1) {
+      setSplitRows([1])
+    } else {
+      setSplitRows([Math.min(2, remaining), remaining - Math.min(2, remaining)])
+    }
+    setShowSplitModal(true)
+  }
+
+  const updateSplitRow = (index: number, value: number) => {
+    setSplitRows((rows) => rows.map((n, i) => (i === index ? Math.max(1, value) : n)))
+  }
+
+  const addSplitRow = () => {
+    setSplitRows((rows) => [...rows, 1])
+  }
+
+  const removeSplitRow = (index: number) => {
+    setSplitRows((rows) => rows.filter((_, i) => i !== index))
+  }
+
+  const splitRemaining = selectedRelease
+    ? selectedRelease.pallets -
+      shipments.filter((s) => s.status === 'SHIPPED').reduce((sum, s) => sum + s.pallets, 0) -
+      splitRows.reduce((sum, n) => sum + n, 0)
+    : 0
+
+  const submitSplitShipment = async () => {
+    if (!selectedRelease) return
+    const splits = splitRows.filter((n) => n > 0)
+    const sum = splits.reduce((a, b) => a + b, 0)
+    const target =
+      selectedRelease.pallets -
+      shipments.filter((s) => s.status === 'SHIPPED').reduce((s, sh) => s + sh.pallets, 0)
+
+    if (sum !== target) {
+      alert(`Shipment skids must total ${target} (currently ${sum}).`)
+      return
+    }
+
+    setIsSplitting(true)
+    try {
+      const response = await fetch(`/api/releases/${selectedRelease.id}/split-shipment`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ palletSplits: splits }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to split shipment')
+      }
+      const data = await response.json()
+      setShipments(data.shipments || data.release?.shipments || [])
+      setReleases(releases.map((r) => (r.id === data.release.id ? data.release : r)))
+      setSelectedRelease(data.release)
+      setShowSplitModal(false)
+      alert(`Split into ${splits.length} shipment${splits.length === 1 ? '' : 's'}: ${splits.join(' + ')} skids (matches EPG release of ${selectedRelease.pallets}).`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to split shipment')
+    } finally {
+      setIsSplitting(false)
+    }
+  }
+
+  const markShipmentShipped = async (shipmentId: string) => {
+    if (!selectedRelease) return
+    const pro = shipmentProInputs[shipmentId]?.trim()
+    if (!pro) {
+      alert('PRO # is required.')
+      return
+    }
+    setMarkingShipmentId(shipmentId)
+    try {
+      const response = await fetch(
+        `/api/releases/${selectedRelease.id}/shipments/${shipmentId}/mark-shipped`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ proNumber: pro, carrier: carrierInput || 'XPO' }),
+        },
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to mark shipment shipped')
+      }
+      const data = await response.json()
+      setShipments(data.release?.shipments || [])
+      setReleases(releases.map((r) => (r.id === data.release.id ? data.release : r)))
+      setSelectedRelease(data.release)
+      alert('Shipment marked shipped. Confirmation email sent to EPG.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to mark shipment shipped')
+    } finally {
+      setMarkingShipmentId(null)
+    }
+  }
+
   const generateDocuments = async (releaseId: string) => {
     try {
       const response = await fetch(`/api/releases/${releaseId}/documents`, {
@@ -238,18 +386,7 @@ function HistoryPageInner() {
       // Update the release in the list
       setReleases(releases.map(r => r.id === data.release.id ? data.release : r))
       setSelectedRelease(data.release)
-      setEditPallets(data.release.pallets)
-
-      if (data.documentsRegenerated) {
-        alert(
-          `Skids updated to ${data.release.pallets}. Packing slip, box labels, and JD paperwork now reflect the new quantity — open JD Paperwork to print.`
-        )
-        if (user?.role === 'ADMIN') {
-          openJdPaperwork(data.release.id)
-        }
-      } else {
-        alert('Release updated successfully!')
-      }
+      alert('Release updated successfully!')
     } catch (err) {
       console.error('Error updating release:', err)
       alert(err instanceof Error ? err.message : 'Failed to update release. Please try again.')
@@ -257,9 +394,6 @@ function HistoryPageInner() {
       setLoading(false)
     }
   }
-
-  const updateSkids = () =>
-    applyReleaseUpdate({ pallets: editPallets }, setIsUpdatingSkids)
 
   const updateRelease = () =>
     applyReleaseUpdate(
@@ -378,9 +512,10 @@ function HistoryPageInner() {
     }
   }
 
-  const openJdPaperwork = (releaseId: string) => {
+  const openJdPaperwork = (releaseId: string, shipmentId?: string) => {
     if (!token) return
-    const url = `/api/releases/${releaseId}/jd-paperwork?token=${encodeURIComponent(token)}&t=${Date.now()}`
+    const shipmentParam = shipmentId ? `&shipmentId=${encodeURIComponent(shipmentId)}` : ''
+    const url = `/api/releases/${releaseId}/jd-paperwork?token=${encodeURIComponent(token)}${shipmentParam}&t=${Date.now()}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -581,10 +716,16 @@ function HistoryPageInner() {
                           <div className="text-xs text-brand-ink-mute">
                             {release.totalUnits.toLocaleString()} units
                           </div>
-                          <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-rust">
-                            <Pencil className="w-3 h-3" />
-                            Edit skids
-                          </div>
+                          {(release.shipments?.length ?? 1) > 1 || release.status === 'PARTIALLY_SHIPPED' ? (
+                            <div className="mt-1 text-xs text-brand-ink-mute">
+                              {release.shipments?.length ?? 1} shipment{(release.shipments?.length ?? 1) === 1 ? '' : 's'}
+                            </div>
+                          ) : (
+                            <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-rust">
+                              <Split className="w-3 h-3" />
+                              Split shipment
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-brand-ink-mute">
                           <div>{release.shippingLocation.name}</div>
@@ -602,12 +743,18 @@ function HistoryPageInner() {
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
                               release.status === 'SHIPPED'
                                 ? 'bg-green-100 text-green-800'
-                                : release.status === 'READY_TO_SHIP'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-yellow-100 text-yellow-800'
+                                : release.status === 'PARTIALLY_SHIPPED'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : release.status === 'READY_TO_SHIP'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {release.status === 'COMPLETED' ? 'OPEN' : release.status}
+                            {release.status === 'COMPLETED'
+                              ? 'OPEN'
+                              : release.status === 'PARTIALLY_SHIPPED'
+                                ? 'PARTIAL'
+                                : release.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
@@ -682,12 +829,18 @@ function HistoryPageInner() {
                   className={`px-3 py-1 rounded-full text-sm font-medium ${
                     selectedRelease.status === 'SHIPPED'
                       ? 'bg-green-100 text-green-800'
-                      : selectedRelease.status === 'READY_TO_SHIP'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-yellow-100 text-yellow-800'
+                      : selectedRelease.status === 'PARTIALLY_SHIPPED'
+                        ? 'bg-orange-100 text-orange-800'
+                        : selectedRelease.status === 'READY_TO_SHIP'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {selectedRelease.status === 'COMPLETED' ? 'OPEN' : selectedRelease.status}
+                  {selectedRelease.status === 'COMPLETED'
+                    ? 'OPEN'
+                    : selectedRelease.status === 'PARTIALLY_SHIPPED'
+                      ? 'PARTIAL'
+                      : selectedRelease.status}
                 </span>
               </div>
 
@@ -701,59 +854,111 @@ function HistoryPageInner() {
                 </div>
               </div>
 
-              {/* Quantity */}
+              {/* EPG original release + shipment sub-lines */}
               <div className="mb-6 p-4 bg-brand-rust-soft rounded-lg border border-brand-rust/20">
-                <h3 className="font-semibold text-brand-ink mb-1">Release Quantity</h3>
+                <h3 className="font-semibold text-brand-ink mb-1">EPG Release (Original)</h3>
                 <p className="text-xs text-brand-ink-mute mb-3">
-                  Splitting across days? Reduce skids here before the truck goes out — packing slip,
-                  BOL, and pallet flags regenerate automatically when you click Update Skids.
+                  Matches what EPG released — split into truck loads without changing this total.
                 </p>
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
-                      Skids to Release
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={editPallets}
-                      onChange={(e) => setEditPallets(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
-                    />
-                    <p className="text-xs text-brand-ink-mute mt-1">
-                      = {editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes} boxes
-                      {' • '}
-                      {(
-                        (editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes) *
-                        selectedRelease.part.unitsPerBox
-                      ).toLocaleString()}{' '}
-                      units
-                    </p>
-                    {editPallets !== selectedRelease.pallets && (
-                      <p className="text-xs text-amber-700 mt-1">
-                        Changing from {selectedRelease.pallets} to {editPallets} skid
-                        {editPallets === 1 ? '' : 's'}.
-                        {editPallets < selectedRelease.pallets
-                          ? ' Freed skids return to available inventory.'
-                          : ''}{' '}
-                        Paperwork refreshes when you click Update Skids.
-                      </p>
-                    )}
-                    <button
-                      onClick={updateSkids}
-                      disabled={isUpdatingSkids || editPallets === selectedRelease.pallets}
-                      className="w-full mt-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isUpdatingSkids ? 'Updating...' : 'Update Skids'}
-                    </button>
+                    <p className="text-sm text-brand-rust">Total Skids</p>
+                    <p className="text-2xl font-bold text-brand-ink">{selectedRelease.pallets}</p>
                   </div>
-                  <div className="pt-1 border-t border-brand-rust/20">
-                    <p className="text-sm text-brand-rust">Saved Total Units</p>
-                    <p className="text-xl font-bold text-brand-ink">
+                  <div>
+                    <p className="text-sm text-brand-rust">Total Units</p>
+                    <p className="text-2xl font-bold text-brand-ink">
                       {selectedRelease.totalUnits.toLocaleString()}
                     </p>
                   </div>
+                </div>
+
+                <button
+                  onClick={openSplitModal}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border-2 border-brand-rust text-brand-rust font-medium rounded-lg hover:bg-brand-rust-soft mb-4"
+                >
+                  <Split className="w-4 h-4" />
+                  Split Shipment
+                </button>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-ink-mute">
+                    Shipment Lines
+                  </p>
+                  {shipments.length === 0 ? (
+                    <p className="text-sm text-brand-ink-mute">Loading shipments…</p>
+                  ) : (
+                    shipments.map((shipment) => (
+                      <div
+                        key={shipment.id}
+                        className="p-3 bg-white rounded-lg border border-brand-rule text-sm"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className="font-semibold text-brand-ink">
+                              Shipment {shipment.shipmentNumber}
+                            </p>
+                            <p className="text-brand-ink-mute">
+                              {shipment.pallets} skid{shipment.pallets === 1 ? '' : 's'} •{' '}
+                              {shipment.totalUnits.toLocaleString()} units
+                            </p>
+                            <p className="text-xs text-brand-ink-mute mt-1">
+                              {shipment.pallets} of {selectedRelease.pallets} from EPG release
+                            </p>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              shipment.status === 'SHIPPED'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
+                            {shipment.status === 'SHIPPED' ? 'SHIPPED' : 'PENDING'}
+                          </span>
+                        </div>
+
+                        {user?.role === 'ADMIN' && shipment.status === 'PENDING' && (
+                          <div className="mt-3 space-y-2 border-t border-brand-rule pt-3">
+                            <button
+                              onClick={() => openJdPaperwork(selectedRelease.id, shipment.id)}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-800"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Paperwork ({shipment.pallets} skid{shipment.pallets === 1 ? '' : 's'})
+                            </button>
+                            <input
+                              type="text"
+                              value={shipmentProInputs[shipment.id] || ''}
+                              onChange={(e) =>
+                                setShipmentProInputs((prev) => ({
+                                  ...prev,
+                                  [shipment.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="PRO # for this truck"
+                              className="w-full px-2 py-1.5 text-xs border border-brand-rule rounded-lg"
+                            />
+                            <button
+                              onClick={() => markShipmentShipped(shipment.id)}
+                              disabled={markingShipmentId === shipment.id}
+                              className="w-full px-3 py-1.5 bg-emerald-700 text-white text-xs font-medium rounded-lg hover:bg-emerald-800 disabled:opacity-50"
+                            >
+                              {markingShipmentId === shipment.id ? 'Saving…' : 'Mark This Truck Shipped'}
+                            </button>
+                          </div>
+                        )}
+
+                        {shipment.status === 'SHIPPED' && shipment.proNumber && (
+                          <p className="text-xs text-emerald-800 mt-2">
+                            PRO {shipment.proNumber}
+                            {shipment.shippedAt
+                              ? ` • ${new Date(shipment.shippedAt).toLocaleDateString()}`
+                              : ''}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -840,28 +1045,8 @@ function HistoryPageInner() {
                 </div>
               </div>
 
-              {/* JD Shipment Paperwork (Apr 2026 EPG new process) */}
-              {user?.role === 'ADMIN' && (
-                <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <h3 className="font-semibold text-brand-ink mb-2 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-slate-700" />
-                    JD Shipment Paperwork
-                  </h3>
-                  <p className="text-xs text-brand-ink-mute mb-3">
-                    JD-branded packing slip + BOL + one pallet flag per skid for XPO pickup. Print and attach flags to skids before pickup.
-                  </p>
-                  <button
-                    onClick={() => openJdPaperwork(selectedRelease.id)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open JD Paperwork ({2 + selectedRelease.pallets} pages: Slip + BOL + {selectedRelease.pallets} Flag{selectedRelease.pallets === 1 ? '' : 's'})
-                  </button>
-                </div>
-              )}
-
-              {/* Mark Shipped (Apr 2026 EPG new process — admin only) */}
-              {user?.role === 'ADMIN' && (
+              {/* Mark Shipped (legacy whole-release — use per-shipment above when split) */}
+              {user?.role === 'ADMIN' && shipments.length <= 1 && (
                 <div className="mb-6 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                   <h3 className="font-semibold text-brand-ink mb-2 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-700" />
@@ -1018,7 +1203,9 @@ function HistoryPageInner() {
               )}
 
               {/* Delete Button - Admin Only, Non-Shipped */}
-              {user?.role === 'ADMIN' && selectedRelease.status !== 'SHIPPED' && (
+              {user?.role === 'ADMIN' &&
+                selectedRelease.status !== 'SHIPPED' &&
+                selectedRelease.status !== 'PARTIALLY_SHIPPED' && (
                 <div className="mt-6 pt-4 border-t border-red-200">
                   <button
                     onClick={deleteRelease}
@@ -1035,6 +1222,92 @@ function HistoryPageInner() {
               )}
             </div>
           </aside>
+        )}
+
+        {showSplitModal && selectedRelease && (
+          <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-brand-ink">Split Shipment</h3>
+                  <p className="text-sm text-brand-ink-mute mt-1">
+                    EPG released <strong>{selectedRelease.pallets} skids</strong> total — assign each
+                    truck below.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSplitModal(false)}
+                  className="p-1 hover:bg-brand-cream-deep rounded-full"
+                >
+                  <X className="w-5 h-5 text-brand-ink-mute" />
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                {splitRows.map((row, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-brand-ink-soft w-28">
+                      Truck {index + 1}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={row}
+                      onChange={(e) =>
+                        updateSplitRow(index, parseInt(e.target.value, 10) || 1)
+                      }
+                      className="flex-1 px-3 py-2 border border-brand-rule rounded-lg"
+                    />
+                    <span className="text-sm text-brand-ink-mute">skids</span>
+                    {splitRows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSplitRow(index)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addSplitRow}
+                className="flex items-center gap-1 text-sm text-brand-rust hover:underline mb-4"
+              >
+                <Plus className="w-4 h-4" />
+                Add another truck
+              </button>
+
+              <p
+                className={`text-sm mb-4 ${
+                  splitRemaining === 0 ? 'text-emerald-700' : 'text-amber-700'
+                }`}
+              >
+                {splitRemaining === 0
+                  ? `✓ Totals match EPG release (${selectedRelease.pallets} skids)`
+                  : `${splitRemaining > 0 ? 'Still unassigned' : 'Over by'} ${Math.abs(splitRemaining)} skid${Math.abs(splitRemaining) === 1 ? '' : 's'}`}
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSplitModal(false)}
+                  className="flex-1 px-4 py-2 border border-brand-rule rounded-lg hover:bg-brand-cream-deep"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitSplitShipment}
+                  disabled={isSplitting || splitRemaining !== 0}
+                  className="flex-1 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50"
+                >
+                  {isSplitting ? 'Saving…' : 'Confirm Split'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

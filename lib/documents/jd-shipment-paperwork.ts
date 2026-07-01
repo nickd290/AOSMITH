@@ -19,6 +19,8 @@ interface LineItem {
   unitsPerBox: number
   ordered: number
   shipped: number
+  prevShip?: number
+  backOrdered?: number
 }
 
 type SkidTypeValue = 'WOOD' | 'HEAT_TREATED'
@@ -52,6 +54,8 @@ interface JdShipmentPaperworkData {
     unitsPerBox: number
     units: number
   }>
+  shipmentLabel?: string
+  originalPallets?: number
 }
 
 const JD_BLUE: [number, number, number] = [26, 30, 46] // #1a1e2e per JD brand
@@ -156,6 +160,25 @@ function drawPackingSlipPage(doc: jsPDF, data: JdShipmentPaperworkData): void {
   y += 20
   doc.text(`Ticket No. ${data.ticketNumber}`, margin, y)
   doc.text(`Customer PO #: ${data.customerPONumber}`, pageWidth - margin, y, { align: 'right' })
+
+  if (data.shipmentLabel) {
+    y += 16
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...ACCENT_ORANGE)
+    doc.text(data.shipmentLabel, margin, y)
+    if (data.originalPallets && data.originalPallets !== data.pallets) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.text(
+        `(EPG release: ${data.originalPallets} skids total)`,
+        margin,
+        y + 12,
+      )
+      y += 12
+    }
+    doc.setTextColor(0, 0, 0)
+  }
 
   y += 28
 
