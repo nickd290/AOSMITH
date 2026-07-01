@@ -607,6 +607,10 @@ export default function ReleasePage() {
                     </span>
                   </div>
                   <div className="pt-2 border-t border-gray-200">
+                    <p className="text-xs text-brand-ink-mute mb-2">
+                      Shipping across multiple days? Set today&apos;s skid count here, then create
+                      another release tomorrow for the balance.
+                    </p>
                     <label className="block text-sm font-medium text-brand-ink-soft mb-1">
                       Skids to Release
                     </label>

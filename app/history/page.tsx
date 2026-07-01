@@ -571,12 +571,10 @@ function HistoryPageInner() {
                           <div className="text-xs text-brand-ink-mute">
                             {release.totalUnits.toLocaleString()} units
                           </div>
-                          {release.status !== 'SHIPPED' && (
-                            <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-rust">
-                              <Pencil className="w-3 h-3" />
-                              Edit skids
-                            </div>
-                          )}
+                          <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-rust">
+                            <Pencil className="w-3 h-3" />
+                            Edit skids
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-brand-ink-mute">
                           <div>{release.shippingLocation.name}</div>
@@ -594,10 +592,12 @@ function HistoryPageInner() {
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
                               release.status === 'SHIPPED'
                                 ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
+                                : release.status === 'READY_TO_SHIP'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {release.status}
+                            {release.status === 'COMPLETED' ? 'OPEN' : release.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-ink-mute">
@@ -672,10 +672,12 @@ function HistoryPageInner() {
                   className={`px-3 py-1 rounded-full text-sm font-medium ${
                     selectedRelease.status === 'SHIPPED'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
+                      : selectedRelease.status === 'READY_TO_SHIP'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {selectedRelease.status}
+                  {selectedRelease.status === 'COMPLETED' ? 'OPEN' : selectedRelease.status}
                 </span>
               </div>
 
@@ -691,65 +693,57 @@ function HistoryPageInner() {
 
               {/* Quantity */}
               <div className="mb-6 p-4 bg-brand-rust-soft rounded-lg border border-brand-rust/20">
-                <h3 className="font-semibold text-brand-ink mb-3">Release Quantity</h3>
-                {selectedRelease.status === 'SHIPPED' ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-brand-rust">Skids</p>
-                      <p className="text-2xl font-bold text-brand-ink">{selectedRelease.pallets}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-brand-rust">Total Units</p>
-                      <p className="text-2xl font-bold text-brand-ink">
-                        {selectedRelease.totalUnits.toLocaleString()}
+                <h3 className="font-semibold text-brand-ink mb-1">Release Quantity</h3>
+                <p className="text-xs text-brand-ink-mute mb-3">
+                  Splitting across days? Reduce skids on this release before the first truck goes out,
+                  then create another release tomorrow for the rest.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-brand-ink-soft mb-1">
+                      Skids to Release
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editPallets}
+                      onChange={(e) => setEditPallets(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-full px-3 py-2 border border-brand-rule rounded-lg"
+                    />
+                    <p className="text-xs text-brand-ink-mute mt-1">
+                      = {editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes} boxes
+                      {' • '}
+                      {(
+                        (editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes) *
+                        selectedRelease.part.unitsPerBox
+                      ).toLocaleString()}{' '}
+                      units
+                    </p>
+                    {editPallets !== selectedRelease.pallets && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Changing from {selectedRelease.pallets} to {editPallets} skid
+                        {editPallets === 1 ? '' : 's'}.
+                        {editPallets < selectedRelease.pallets
+                          ? ' Freed skids return to available inventory.'
+                          : ' Regenerate documents after saving.'}
                       </p>
-                    </div>
+                    )}
+                    <button
+                      onClick={updateSkids}
+                      disabled={isUpdatingSkids || editPallets === selectedRelease.pallets}
+                      className="w-full mt-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUpdatingSkids ? 'Updating...' : 'Update Skids'}
+                    </button>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-brand-ink-soft mb-1">
-                        Skids to Release
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={editPallets}
-                        onChange={(e) => setEditPallets(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        className="w-full px-3 py-2 border border-brand-rule rounded-lg"
-                      />
-                      <p className="text-xs text-brand-ink-mute mt-1">
-                        = {editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes} boxes
-                        {' • '}
-                        {(
-                          (editPallets * selectedRelease.part.boxesPerPallet + selectedRelease.boxes) *
-                          selectedRelease.part.unitsPerBox
-                        ).toLocaleString()}{' '}
-                        units
-                      </p>
-                      {editPallets !== selectedRelease.pallets && (
-                        <p className="text-xs text-amber-700 mt-1">
-                          Changing from {selectedRelease.pallets} to {editPallets} skid
-                          {editPallets === 1 ? '' : 's'}. Regenerate documents after saving.
-                        </p>
-                      )}
-                      <button
-                        onClick={updateSkids}
-                        disabled={isUpdatingSkids || editPallets === selectedRelease.pallets}
-                        className="w-full mt-2 px-4 py-2 bg-brand-rust text-white font-medium rounded-lg hover:bg-brand-rust-dark disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isUpdatingSkids ? 'Updating...' : 'Update Skids'}
-                      </button>
-                    </div>
-                    <div className="pt-1 border-t border-brand-rust/20">
-                      <p className="text-sm text-brand-rust">Current Total Units</p>
-                      <p className="text-xl font-bold text-brand-ink">
-                        {selectedRelease.totalUnits.toLocaleString()}
-                      </p>
-                    </div>
+                  <div className="pt-1 border-t border-brand-rust/20">
+                    <p className="text-sm text-brand-rust">Saved Total Units</p>
+                    <p className="text-xl font-bold text-brand-ink">
+                      {selectedRelease.totalUnits.toLocaleString()}
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Shipping Info */}

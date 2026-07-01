@@ -116,13 +116,6 @@ export async function PATCH(
     }
 
     if (body.pallets !== undefined) {
-      if (existingRelease.status === 'SHIPPED') {
-        return NextResponse.json(
-          { error: 'Cannot change skid count on a shipped release' },
-          { status: 400 }
-        )
-      }
-
       const parsedPallets = Number(body.pallets)
       if (!Number.isInteger(parsedPallets) || parsedPallets < 1) {
         return NextResponse.json(
