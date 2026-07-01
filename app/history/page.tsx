@@ -99,6 +99,7 @@ function HistoryPageInner() {
   const [splitRows, setSplitRows] = useState<number[]>([2, 3])
   const [isSplitting, setIsSplitting] = useState(false)
   const [markingShipmentId, setMarkingShipmentId] = useState<string | null>(null)
+  const [unmarkingShipmentId, setUnmarkingShipmentId] = useState<string | null>(null)
   const [shipmentProInputs, setShipmentProInputs] = useState<Record<string, string>>({})
 
   // Filters
@@ -298,6 +299,45 @@ function HistoryPageInner() {
       alert(err instanceof Error ? err.message : 'Failed to split shipment')
     } finally {
       setIsSplitting(false)
+    }
+  }
+
+  const unmarkShipmentShipped = async (shipment: ReleaseShipment) => {
+    if (!selectedRelease) return
+    if (
+      !confirm(
+        `Mark Shipment ${shipment.shipmentNumber} as NOT shipped?\n\nThis clears PRO ${shipment.proNumber || '(none)'} and reopens the truck for paperwork.`,
+      )
+    ) {
+      return
+    }
+
+    setUnmarkingShipmentId(shipment.id)
+    try {
+      const response = await fetch(
+        `/api/releases/${selectedRelease.id}/shipments/${shipment.id}/unmark-shipped`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to unmark shipment')
+      }
+      const data = await response.json()
+      setShipments(data.release?.shipments || [])
+      setReleases(releases.map((r) => (r.id === data.release.id ? data.release : r)))
+      setSelectedRelease(data.release)
+      setShipmentProInputs((prev) => {
+        const next = { ...prev }
+        delete next[shipment.id]
+        return next
+      })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to unmark shipment')
+    } finally {
+      setUnmarkingShipmentId(null)
     }
   }
 
@@ -948,13 +988,28 @@ function HistoryPageInner() {
                           </div>
                         )}
 
-                        {shipment.status === 'SHIPPED' && shipment.proNumber && (
-                          <p className="text-xs text-emerald-800 mt-2">
-                            PRO {shipment.proNumber}
-                            {shipment.shippedAt
-                              ? ` • ${new Date(shipment.shippedAt).toLocaleDateString()}`
-                              : ''}
-                          </p>
+                        {shipment.status === 'SHIPPED' && (
+                          <div className="mt-3 space-y-2 border-t border-brand-rule pt-3">
+                            {shipment.proNumber && (
+                              <p className="text-xs text-emerald-800">
+                                PRO {shipment.proNumber}
+                                {shipment.shippedAt
+                                  ? ` • ${new Date(shipment.shippedAt).toLocaleDateString()}`
+                                  : ''}
+                              </p>
+                            )}
+                            {user?.role === 'ADMIN' && (
+                              <button
+                                onClick={() => unmarkShipmentShipped(shipment)}
+                                disabled={unmarkingShipmentId === shipment.id}
+                                className="w-full px-3 py-1.5 border border-amber-300 bg-amber-50 text-amber-900 text-xs font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50"
+                              >
+                                {unmarkingShipmentId === shipment.id
+                                  ? 'Reverting…'
+                                  : 'Mark Not Shipped'}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))

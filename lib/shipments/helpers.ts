@@ -81,9 +81,27 @@ export async function syncReleaseStatusFromShipments(releaseId: string): Promise
     status = 'PARTIALLY_SHIPPED'
   }
 
+  const shipped = shipments.filter((s) => s.status === 'SHIPPED')
+  const latestShipped = [...shipped].sort(
+    (a, b) => (b.shippedAt?.getTime() ?? 0) - (a.shippedAt?.getTime() ?? 0),
+  )[0]
+
   await prisma.release.update({
     where: { id: releaseId },
-    data: { status },
+    data: {
+      status,
+      ...(allShipped && latestShipped
+        ? {
+            proNumber: latestShipped.proNumber,
+            trackingNumber: latestShipped.proNumber,
+            shippedAt: latestShipped.shippedAt,
+          }
+        : {
+            proNumber: null,
+            trackingNumber: null,
+            shippedAt: null,
+          }),
+    },
   })
 }
 
