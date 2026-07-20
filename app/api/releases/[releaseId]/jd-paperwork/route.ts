@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizeDocumentRequest, releaseWhereIdOrNumber } from '@/lib/document-access'
 import { prisma } from '@/lib/db'
-import { getUserFromToken } from '@/lib/auth'
 import { generateJdShipmentPaperwork } from '@/lib/documents/jd-shipment-paperwork'
 import { appendLoadFlagsPages } from '@/lib/documents/load-flags'
 import { ensureDefaultShipment } from '@/lib/shipments/helpers'
@@ -21,31 +21,17 @@ export async function GET(
   { params }: { params: Promise<{ releaseId: string }> },
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const tokenFromHeader = authHeader?.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : null
-    const tokenFromQuery = request.nextUrl.searchParams.get('token')
-    const token = tokenFromHeader || tokenFromQuery
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await getUserFromToken(token)
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
+    // An ADMIN user token as before, or press-planner calling server-to-server
+    // with the service key so staff open this from the job's Files panel.
+    const denied = await authorizeDocumentRequest(request)
+    if (denied) return denied
 
     const { releaseId } = await params
     const shipmentId = request.nextUrl.searchParams.get('shipmentId')
 
-    const release = await prisma.release.findUnique({
-      where: { id: releaseId },
+    // press-planner addresses releases by number, not by IRA's cuid.
+    const release = await prisma.release.findFirst({
+      where: releaseWhereIdOrNumber(releaseId),
       include: { part: true, shippingLocation: true },
     })
 

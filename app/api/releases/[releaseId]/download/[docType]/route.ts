@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizeDocumentRequest, releaseWhereIdOrNumber } from '@/lib/document-access'
 import { prisma } from '@/lib/db'
-import { getUserFromToken } from '@/lib/auth'
 import { generatePackingSlipBuffer } from '@/lib/documents/packing-slip'
 import { generateBoxLabelsBuffer } from '@/lib/documents/box-labels'
 import { generateInvoiceBuffer } from '@/lib/documents/invoice'
@@ -16,24 +16,11 @@ export async function GET(
   { params }: { params: Promise<{ releaseId: string; docType: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const user = await getUserFromToken(token)
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
-    }
+    // Any authenticated user as before — customers are meant to fetch their own
+    // release documents here — or press-planner calling server-to-server with the
+    // service key so staff open this from the job's Files panel.
+    const denied = await authorizeDocumentRequest(request, { requireAdmin: false })
+    if (denied) return denied
 
     const { releaseId, docType } = await params
 
@@ -47,8 +34,9 @@ export async function GET(
     }
 
     // Get release with all related data
-    const release = await prisma.release.findUnique({
-      where: { id: releaseId },
+    // press-planner addresses releases by number, not by IRA's cuid.
+    const release = await prisma.release.findFirst({
+      where: releaseWhereIdOrNumber(releaseId),
       include: {
         part: true,
         shippingLocation: true,
